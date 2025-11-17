@@ -20,13 +20,23 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/uart.h"
 
 #define REMOTE_SERVICE_UUID        0xFFE0
 #define REMOTE_NOTIFY_CHAR_UUID    0xFFE1
 #define PROFILE_NUM                1
 #define PROFILE_A_APP_ID           0
 #define INVALID_HANDLE             0
-#define DEVICE_NAME                "sallen_hm10"
+#define DEVICE_NAME                "sallen_hm10"     // Fill in the name of your HM-10 device here
+
+// UART Configuration
+#define UART_PORT_NUM              UART_NUM_0
+#define UART_BAUD_RATE             115200
+#define UART_TX_PIN                UART_PIN_NO_CHANGE
+#define UART_RX_PIN                UART_PIN_NO_CHANGE
+#define UART_BUF_SIZE              1024
+#define UART_RX_TASK_STACK_SIZE    2048
+#define UART_RX_TASK_PRIORITY      10
 
 static const char* TAG = "GATTC_HM10";
 
@@ -62,6 +72,9 @@ static esp_gatt_id_t remote_char_id;
 static esp_bd_addr_t target_device_addr;
 static bool target_device_found = false;
 
+// UART data buffer
+static uint8_t uart_data[UART_BUF_SIZE];
+
 // BLE scan parameters
 static esp_ble_scan_params_t ble_scan_params = {
     .scan_type              = BLE_SCAN_TYPE_ACTIVE,
@@ -71,6 +84,66 @@ static esp_ble_scan_params_t ble_scan_params = {
     .scan_window            = 0x30,
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
+
+// UART receive task - reads user input and sends to BLE
+static void uart_rx_task(void *arg)
+{
+    while (1) {
+        int len = uart_read_bytes(UART_PORT_NUM, uart_data, UART_BUF_SIZE - 1, 20 / portTICK_PERIOD_MS);
+
+        if (len > 0) {
+            uart_data[len] = '\0';  // Null terminate for safety
+
+            // Check if BLE is connected and we have a valid characteristic handle
+            if (connect && gl_profile_tab[PROFILE_A_APP_ID].char_handle != INVALID_HANDLE) {
+                ESP_LOGI(TAG, "Sending to BLE (%d bytes): %s", len, uart_data);
+
+                // Send data to BLE characteristic
+                esp_ble_gattc_write_char(
+                    gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
+                    gl_profile_tab[PROFILE_A_APP_ID].conn_id,
+                    gl_profile_tab[PROFILE_A_APP_ID].char_handle,
+                    len,
+                    uart_data,
+                    ESP_GATT_WRITE_TYPE_RSP,
+                    ESP_GATT_AUTH_REQ_NONE
+                );
+            } else {
+                printf("[WARNING] BLE not connected. Cannot send data.\n");
+            }
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
+
+// Initialize UART for user input/output
+static void uart_init(void)
+{
+    const uart_config_t uart_config = {
+        .baud_rate = UART_BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+
+    // Install UART driver
+    uart_driver_install(UART_PORT_NUM, UART_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_PORT_NUM, &uart_config);
+    uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    // Create UART receive task
+    xTaskCreate(uart_rx_task, "uart_rx_task", UART_RX_TASK_STACK_SIZE, NULL, UART_RX_TASK_PRIORITY, NULL);
+
+    printf("\n");
+    printf("========================================\n");
+    printf("  ESP32 <-> HM-10 BLE UART Bridge\n");
+    printf("========================================\n");
+    printf("Type messages to send to HM-10 via BLE\n");
+    printf("Incoming BLE data will appear here\n");
+    printf("========================================\n\n");
+}
 
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
 {
@@ -257,6 +330,11 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         ESP_LOGI(TAG, "ESP_GATTC_NOTIFY_EVT, receive notify value:");
         esp_log_buffer_hex(TAG, p_data->notify.value, p_data->notify.value_len);
         ESP_LOGI(TAG, "Notification data (string): %.*s", p_data->notify.value_len, p_data->notify.value);
+
+        // Output received data to UART for user
+        printf("[BLE RX] ");
+        uart_write_bytes(UART_PORT_NUM, (const char *)p_data->notify.value, p_data->notify.value_len);
+        printf("\n");
         break;
 
     case ESP_GATTC_READ_CHAR_EVT:
@@ -278,12 +356,17 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                                     (uint8_t *)write_data,
                                     ESP_GATT_WRITE_TYPE_RSP,
                                     ESP_GATT_AUTH_REQ_NONE);
+
+            // Notify user that connection is ready
+            printf("\n>>> BLE Connected and Ready! <<<\n");
+            printf(">>> You can now type messages to send to HM-10 <<<\n\n");
         }
         break;
 
     case ESP_GATTC_WRITE_CHAR_EVT:
         if (p_data->write.status != ESP_GATT_OK) {
             ESP_LOGE(TAG, "WRITE char failed, error status = %x", p_data->write.status);
+            printf("[ERROR] Failed to send data to BLE\n");
         } else {
             ESP_LOGI(TAG, "WRITE char success");
             ESP_LOGI(TAG, "Connection active - waiting for notifications...");
@@ -304,7 +387,10 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         get_service = false;
         ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
         ESP_LOGI(TAG, "Disconnected. Restarting scan to reconnect...");
-        
+
+        // Notify user about disconnection
+        printf("\n>>> BLE Disconnected! Attempting to reconnect... <<<\n\n");
+
         // Restart scanning after a short delay
         vTaskDelay(2000 / portTICK_PERIOD_MS);
         esp_ble_gap_start_scanning(30);
@@ -346,15 +432,16 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 if (strlen(DEVICE_NAME) == adv_name_len && strncmp((char *)adv_name, DEVICE_NAME, adv_name_len) == 0) {
                     ESP_LOGI(TAG, "Found target device: %s", DEVICE_NAME);
                     esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
-                    
+
                     if (!connect) {
                         connect = true;
+                        printf(">>> Found HM-10! Connecting... <<<\n");
                         ESP_LOGI(TAG, "Stopping scan and connecting...");
                         esp_ble_gap_stop_scanning();
                         memcpy(target_device_addr, scan_result->scan_rst.bda, sizeof(esp_bd_addr_t));
-                        esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, 
-                                          target_device_addr, 
-                                          scan_result->scan_rst.ble_addr_type, 
+                        esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
+                                          target_device_addr,
+                                          scan_result->scan_rst.ble_addr_type,
                                           true);
                     }
                 }
@@ -412,6 +499,9 @@ static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting BLE GATT Client for HM-10");
+
+    // Initialize UART first for user feedback
+    uart_init();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
