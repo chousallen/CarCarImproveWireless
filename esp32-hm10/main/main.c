@@ -27,7 +27,7 @@
 #define PROFILE_NUM                1
 #define PROFILE_A_APP_ID           0
 #define INVALID_HANDLE             0
-#define DEVICE_NAME                "sallen_hm10"     // Fill in the name of your HM-10 device here
+#define DEVICE_NAME                "HMSoft"     // Fill in the name of your HM-10 device here
 
 // UART Configuration
 #define UART_PORT_NUM              UART_NUM_0
@@ -38,7 +38,8 @@
 #define UART_RX_TASK_STACK_SIZE    2048
 #define UART_RX_TASK_PRIORITY      10
 
-static const char* TAG = "GATTC_HM10";
+static const char* TAG = "GATTC_HM10";      // TAG for general logs
+static const char* TAG_BT_COM = "bt_com";   // TAG for BLE communication data
 
 // GATT client profile instance
 struct gattc_profile_inst {
@@ -96,7 +97,8 @@ static void uart_rx_task(void *arg)
 
             // Check if BLE is connected and we have a valid characteristic handle
             if (connect && gl_profile_tab[PROFILE_A_APP_ID].char_handle != INVALID_HANDLE) {
-                ESP_LOGI(TAG, "Sending to BLE (%d bytes): %s", len, uart_data);
+                // Log sent data with bt_com TAG
+                ESP_LOGI(TAG_BT_COM, "%s", uart_data);
 
                 // Send data to BLE characteristic
                 esp_ble_gattc_write_char(
@@ -327,14 +329,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
 
     case ESP_GATTC_NOTIFY_EVT:
-        ESP_LOGI(TAG, "ESP_GATTC_NOTIFY_EVT, receive notify value:");
-        esp_log_buffer_hex(TAG, p_data->notify.value, p_data->notify.value_len);
-        ESP_LOGI(TAG, "Notification data (string): %.*s", p_data->notify.value_len, p_data->notify.value);
-
-        // Output received data to UART for user
-        printf("[BLE RX] ");
-        uart_write_bytes(UART_PORT_NUM, (const char *)p_data->notify.value, p_data->notify.value_len);
-        printf("\n");
+        // Output received BLE data with bt_com TAG
+        ESP_LOGE(TAG_BT_COM, "%.*s", p_data->notify.value_len, p_data->notify.value);
         break;
 
     case ESP_GATTC_READ_CHAR_EVT:

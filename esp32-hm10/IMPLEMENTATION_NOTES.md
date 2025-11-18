@@ -62,6 +62,81 @@ esp_ble_gattc_write_char(gattc_if, conn_id, char_handle, value_len, value, write
 → ESP_GATTC_WRITE_CHAR_EVT (confirmation)
 ```
 
+## UART VCP Layer
+
+### 6. UART Configuration
+
+UART uses the default USB-Serial port (UART0) with the following settings:
+
+```c
+#define UART_PORT_NUM              UART_NUM_0
+#define UART_BAUD_RATE             115200
+#define UART_BUF_SIZE              1024
+```
+
+Configuration: 8 data bits, no parity, 1 stop bit, no flow control.
+
+### 7. UART RX Task
+
+The `uart_rx_task()` function runs as a FreeRTOS task that:
+
+1. Reads bytes from UART with 20ms timeout
+2. Checks if BLE is connected (`connect` flag and valid `char_handle`)
+3. Calls `esp_ble_gattc_write_char()` to send data to HM-10
+4. Delays 100ms between read cycles
+
+```c
+uart_rx_task() -> uart_read_bytes() -> esp_ble_gattc_write_char()
+```
+
+### 8. Log TAG Convention
+
+Two TAGs are used to separate system logs from BLE data:
+
+```c
+static const char* TAG = "GATTC_HM10";      // System/debug logs
+static const char* TAG_BT_COM = "bt_com";   // BLE communication data
+```
+
+**Usage:**
+- `ESP_LOGI(TAG_BT_COM, ...)` - Data sent to BLE (TX)
+- `ESP_LOGE(TAG_BT_COM, ...)` - Data received from BLE (RX)
+
+The `ESP_LOGE` level is used for RX to make received data visually distinct (red color in terminal).
+
+### 9. BLE Notification Handling
+
+When `ESP_GATTC_NOTIFY_EVT` is received, the data is output using:
+
+```c
+ESP_LOGE(TAG_BT_COM, "%.*s", p_data->notify.value_len, p_data->notify.value);
+```
+
+This outputs the raw notification data with the `bt_com` tag.
+
+### 10. Initialization Order
+
+In `app_main()`:
+
+```c
+1. uart_init()           // UART driver and RX task
+2. nvs_flash_init()      // NVS for BLE stack
+3. esp_bt_controller_*   // BT controller
+4. esp_bluedroid_*       // Bluedroid stack
+5. Register callbacks    // GAP and GATTC
+6. esp_ble_gattc_app_register()
+```
+
+UART is initialized first to display the welcome banner before BLE initialization logs.
+
+### 11. Dependencies
+
+CMakeLists.txt requires the `driver` component for UART:
+
+```cmake
+PRIV_REQUIRES bt nvs_flash driver
+```
+
 ## UUID Format Note
 
 The HM-10 uses 128-bit UUIDs, but the code uses 16-bit shortcuts:
