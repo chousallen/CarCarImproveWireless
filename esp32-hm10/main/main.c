@@ -110,8 +110,6 @@ static void uart_rx_task(void *arg)
                     ESP_GATT_WRITE_TYPE_RSP,
                     ESP_GATT_AUTH_REQ_NONE
                 );
-            } else {
-                printf("[WARNING] BLE not connected. Cannot send data.\n");
             }
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -137,14 +135,6 @@ static void uart_init(void)
 
     // Create UART receive task
     xTaskCreate(uart_rx_task, "uart_rx_task", UART_RX_TASK_STACK_SIZE, NULL, UART_RX_TASK_PRIORITY, NULL);
-
-    printf("\n");
-    printf("========================================\n");
-    printf("  ESP32 <-> HM-10 BLE UART Bridge\n");
-    printf("========================================\n");
-    printf("Type messages to send to HM-10 via BLE\n");
-    printf("Incoming BLE data will appear here\n");
-    printf("========================================\n\n");
 }
 
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param)
@@ -342,27 +332,22 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             ESP_LOGI(TAG, "Read data (string): %.*s", p_data->read.value_len, p_data->read.value);
             
             // Write example data to the characteristic
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            char write_data[] = "Hello from ESP32!";
-            ESP_LOGI(TAG, "Writing to characteristic...");
-            esp_ble_gattc_write_char(gattc_if,
-                                    gl_profile_tab[PROFILE_A_APP_ID].conn_id,
-                                    gl_profile_tab[PROFILE_A_APP_ID].char_handle,
-                                    sizeof(write_data),
-                                    (uint8_t *)write_data,
-                                    ESP_GATT_WRITE_TYPE_RSP,
-                                    ESP_GATT_AUTH_REQ_NONE);
-
-            // Notify user that connection is ready
-            printf("\n>>> BLE Connected and Ready! <<<\n");
-            printf(">>> You can now type messages to send to HM-10 <<<\n\n");
+            // vTaskDelay(1000 / portTICK_PERIOD_MS);
+            // char write_data[] = "Hello from ESP32!";
+            // ESP_LOGI(TAG, "Writing to characteristic...");
+            // esp_ble_gattc_write_char(gattc_if,
+            //                         gl_profile_tab[PROFILE_A_APP_ID].conn_id,
+            //                         gl_profile_tab[PROFILE_A_APP_ID].char_handle,
+            //                         sizeof(write_data),
+            //                         (uint8_t *)write_data,
+            //                         ESP_GATT_WRITE_TYPE_RSP,
+            //                         ESP_GATT_AUTH_REQ_NONE);
         }
         break;
 
     case ESP_GATTC_WRITE_CHAR_EVT:
         if (p_data->write.status != ESP_GATT_OK) {
             ESP_LOGE(TAG, "WRITE char failed, error status = %x", p_data->write.status);
-            printf("[ERROR] Failed to send data to BLE\n");
         } else {
             ESP_LOGI(TAG, "WRITE char success");
             ESP_LOGI(TAG, "Connection active - waiting for notifications...");
@@ -383,9 +368,6 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         get_service = false;
         ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
         ESP_LOGI(TAG, "Disconnected. Restarting scan to reconnect...");
-
-        // Notify user about disconnection
-        printf("\n>>> BLE Disconnected! Attempting to reconnect... <<<\n\n");
 
         // Restart scanning after a short delay
         vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -431,7 +413,6 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 
                     if (!connect) {
                         connect = true;
-                        printf(">>> Found HM-10! Connecting... <<<\n");
                         ESP_LOGI(TAG, "Stopping scan and connecting...");
                         esp_ble_gap_stop_scanning();
                         memcpy(target_device_addr, scan_result->scan_rst.bda, sizeof(esp_bd_addr_t));
