@@ -27,7 +27,7 @@
 #define PROFILE_NUM                1
 #define PROFILE_A_APP_ID           0
 #define INVALID_HANDLE             0
-#define DEVICE_NAME                "HMSoft"     // Fill in the name of your HM-10 device here
+#define DEVICE_NAME                "sallen_hm10"     // Fill in the name of your HM-10 device here
 
 // UART Configuration
 #define UART_PORT_NUM              UART_NUM_0
@@ -66,12 +66,12 @@ static struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
 
 static bool connect = false;
 static bool get_service = false;
-static esp_gatt_srvc_id_t remote_service_id;
-static esp_gatt_id_t remote_char_id;
+// static esp_gatt_srvc_id_t remote_service_id;
+// static esp_gatt_id_t remote_char_id;
 
 // Target device address (will be filled during scan)
 static esp_bd_addr_t target_device_addr;
-static bool target_device_found = false;
+// static bool target_device_found = false;
 
 // UART data buffer
 static uint8_t uart_data[UART_BUF_SIZE];
@@ -98,7 +98,7 @@ static void uart_rx_task(void *arg)
             // Check if BLE is connected and we have a valid characteristic handle
             if (connect && gl_profile_tab[PROFILE_A_APP_ID].char_handle != INVALID_HANDLE) {
                 // Log sent data with bt_com TAG
-                ESP_LOGI(TAG_BT_COM, "%s", uart_data);
+                // ESP_LOGI(TAG_BT_COM, "%s", uart_data);
 
                 // Send data to BLE characteristic
                 esp_ble_gattc_write_char(
@@ -153,8 +153,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         gl_profile_tab[PROFILE_A_APP_ID].conn_id = p_data->connect.conn_id;
         memcpy(gl_profile_tab[PROFILE_A_APP_ID].remote_bda, p_data->connect.remote_bda, sizeof(esp_bd_addr_t));
         ESP_LOGI(TAG, "REMOTE BDA:");
-        esp_log_buffer_hex(TAG, gl_profile_tab[PROFILE_A_APP_ID].remote_bda, sizeof(esp_bd_addr_t));
-        
+        ESP_LOG_BUFFER_HEX(TAG, gl_profile_tab[PROFILE_A_APP_ID].remote_bda, sizeof(esp_bd_addr_t));
+
         // Configure MTU
         esp_err_t mtu_ret = esp_ble_gattc_send_mtu_req(gattc_if, p_data->connect.conn_id);
         if (mtu_ret) {
@@ -320,7 +320,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
 
     case ESP_GATTC_NOTIFY_EVT:
         // Output received BLE data with bt_com TAG
-        ESP_LOGE(TAG_BT_COM, "%.*s", p_data->notify.value_len, p_data->notify.value);
+        ESP_LOGI(TAG_BT_COM, "%.*s", p_data->notify.value_len, p_data->notify.value);
         break;
 
     case ESP_GATTC_READ_CHAR_EVT:
@@ -328,7 +328,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             ESP_LOGE(TAG, "READ char failed, error status = %x", p_data->read.status);
         } else {
             ESP_LOGI(TAG, "READ char success:");
-            esp_log_buffer_hex(TAG, p_data->read.value, p_data->read.value_len);
+            ESP_LOG_BUFFER_HEX(TAG, p_data->read.value, p_data->read.value_len);
             ESP_LOGI(TAG, "Read data (string): %.*s", p_data->read.value_len, p_data->read.value);
             
             // Write example data to the characteristic
@@ -349,9 +349,9 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         if (p_data->write.status != ESP_GATT_OK) {
             ESP_LOGE(TAG, "WRITE char failed, error status = %x", p_data->write.status);
         } else {
-            ESP_LOGI(TAG, "WRITE char success");
-            ESP_LOGI(TAG, "Connection active - waiting for notifications...");
-            ESP_LOGI(TAG, "Send data to the HM-10 to see notifications here!");
+            // ESP_LOGI(TAG, "WRITE char success");
+            // ESP_LOGI(TAG, "Connection active - waiting for notifications...");
+            // ESP_LOGI(TAG, "Send data to the HM-10 to see notifications here!");
         }
         break;
 
@@ -409,7 +409,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             if (adv_name != NULL) {
                 if (strlen(DEVICE_NAME) == adv_name_len && strncmp((char *)adv_name, DEVICE_NAME, adv_name_len) == 0) {
                     ESP_LOGI(TAG, "Found target device: %s", DEVICE_NAME);
-                    esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
+                    ESP_LOG_BUFFER_HEX(TAG, scan_result->scan_rst.bda, 6);
 
                     if (!connect) {
                         connect = true;
