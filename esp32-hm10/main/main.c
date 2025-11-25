@@ -18,6 +18,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
@@ -27,7 +28,10 @@
 #define PROFILE_NUM                1
 #define PROFILE_A_APP_ID           0
 #define INVALID_HANDLE             0
-#define DEVICE_NAME                "sallen_hm10"     // Fill in the name of your HM-10 device here
+#define NVS_NAMESPACE              "config"
+#define NVS_DEVICE_NAME_KEY        "device_name"
+#define MAX_DEVICE_NAME_LEN        32
+#define AT_CMD_PREFIX              "AT+NAME"
 
 // UART Configuration
 #define UART_PORT_NUM              UART_NUM_0
@@ -73,6 +77,9 @@ static bool get_service = false;
 static esp_bd_addr_t target_device_addr;
 // static bool target_device_found = false;
 
+// Target device name (loaded from NVS)
+static char target_device_name[MAX_DEVICE_NAME_LEN] = "sallen_hm10";  // Default value
+
 // UART data buffer
 static uint8_t uart_data[UART_BUF_SIZE];
 
@@ -86,6 +93,74 @@ static esp_ble_scan_params_t ble_scan_params = {
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
+// Function to save device name to NVS
+static esp_err_t save_device_name_to_nvs(const char* device_name)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = nvs_set_str(nvs_handle, NVS_DEVICE_NAME_KEY, device_name);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error writing device name: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error committing NVS: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "Device name saved to NVS: %s", device_name);
+    }
+
+    nvs_close(nvs_handle);
+    return err;
+}
+
+// Function to load device name from NVS
+static esp_err_t load_device_name_from_nvs(char* device_name, size_t max_len)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+
+    err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    size_t required_size = 0;
+    err = nvs_get_str(nvs_handle, NVS_DEVICE_NAME_KEY, NULL, &required_size);
+    
+    if (err == ESP_OK && required_size > 0) {
+        if (required_size > max_len) {
+            ESP_LOGE(TAG, "Device name too long in NVS: %d bytes", required_size);
+            nvs_close(nvs_handle);
+            return ESP_ERR_NVS_INVALID_LENGTH;
+        }
+
+        err = nvs_get_str(nvs_handle, NVS_DEVICE_NAME_KEY, device_name, &required_size);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Device name loaded from NVS: %s", device_name);
+        } else {
+            ESP_LOGE(TAG, "Error reading device name: %s", esp_err_to_name(err));
+        }
+    } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGI(TAG, "Device name not found in NVS, using default: %s", device_name);
+    } else {
+        ESP_LOGE(TAG, "Error getting device name size: %s", esp_err_to_name(err));
+    }
+
+    nvs_close(nvs_handle);
+    return err;
+}
+
 // UART receive task - reads user input and sends to BLE
 static void uart_rx_task(void *arg)
 {
@@ -94,6 +169,52 @@ static void uart_rx_task(void *arg)
 
         if (len > 0) {
             uart_data[len] = '\0';  // Null terminate for safety
+
+            // Trim trailing CR/LF for command parsing
+            char *cmd = (char *)uart_data;
+            size_t cmd_len = strlen(cmd);
+            while (cmd_len > 0 && (cmd[cmd_len - 1] == '\r' || cmd[cmd_len - 1] == '\n')) {
+                cmd[cmd_len - 1] = '\0';
+                cmd_len--;
+            }
+
+            // Handle AT+RESET (reply then reset)
+            if (strcmp(cmd, "AT+RESET") == 0) {
+                ESP_LOGI(TAG_BT_COM, "OK+RESET");
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                esp_restart();
+                continue; // not reached, but keep for clarity
+            }
+
+            // Handle AT+NAME? query
+            if (strcmp(cmd, "AT+NAME?") == 0) {
+                ESP_LOGI(TAG_BT_COM, "OK+NAME%s", target_device_name);
+                continue;
+            }
+
+            // Check if this is an AT command
+            if (strncmp(cmd, AT_CMD_PREFIX, strlen(AT_CMD_PREFIX)) == 0) {
+                // Extract device name after AT+NAME
+                char* new_name = (char*)cmd + strlen(AT_CMD_PREFIX);
+                size_t name_len = strlen(new_name);
+
+                if (name_len > 0 && name_len < MAX_DEVICE_NAME_LEN) {
+                    // Save to NVS
+                    esp_err_t err = save_device_name_to_nvs(new_name);
+                    if (err == ESP_OK) {
+                        ESP_LOGI(TAG_BT_COM, "OK+SET%s", new_name);
+                        // Update the in-memory copy
+                        strncpy(target_device_name, new_name, MAX_DEVICE_NAME_LEN - 1);
+                        target_device_name[MAX_DEVICE_NAME_LEN - 1] = '\0';
+                    } else {
+                        ESP_LOGE(TAG, "Failed to save device name to NVS");
+                    }
+                } else {
+                    ESP_LOGE(TAG, "Invalid device name length: %d", name_len);
+                }
+                // Don't forward AT commands to BLE
+                continue;
+            }
 
             // Check if BLE is connected and we have a valid characteristic handle
             if (connect && gl_profile_tab[PROFILE_A_APP_ID].char_handle != INVALID_HANDLE) {
@@ -407,8 +528,8 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                                                 ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
             
             if (adv_name != NULL) {
-                if (strlen(DEVICE_NAME) == adv_name_len && strncmp((char *)adv_name, DEVICE_NAME, adv_name_len) == 0) {
-                    ESP_LOGI(TAG, "Found target device: %s", DEVICE_NAME);
+                if (strlen(target_device_name) == adv_name_len && strncmp((char *)adv_name, target_device_name, adv_name_len) == 0) {
+                    ESP_LOGI(TAG, "Found target device: %s", target_device_name);
                     ESP_LOG_BUFFER_HEX(TAG, scan_result->scan_rst.bda, 6);
 
                     if (!connect) {
@@ -488,6 +609,10 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    // Load target device name from NVS
+    load_device_name_from_nvs(target_device_name, MAX_DEVICE_NAME_LEN);
+    ESP_LOGI(TAG, "Target device name: %s", target_device_name);
+
     // Release classic BT memory
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -542,5 +667,6 @@ void app_main(void)
         ESP_LOGE(TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
     }
 
-    ESP_LOGI(TAG, "BLE GATT Client initialized, searching for device: %s", DEVICE_NAME);
+    ESP_LOGI(TAG, "BLE GATT Client initialized, searching for device: %s", target_device_name);
+    ESP_LOGI(TAG, "To change target device, send: AT+NAME<device_name>");
 }
