@@ -409,6 +409,13 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# HM-10 BLE Bridge Configuration
+#
+CONFIG_HM10_DEVICE_NAME="HMSoft"
+CONFIG_HM10_DEVICE_MAC=""
+# end of HM-10 BLE Bridge Configuration
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

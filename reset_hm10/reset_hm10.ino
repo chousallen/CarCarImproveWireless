@@ -5,7 +5,7 @@ void setup() {
   // Communicate with your PC at a baud rate of 115200
   Serial.begin(115200);
   // Set 10 ms timeout for faster return from readStringUntil()
-  Serial.setTimeout(1000);
+  Serial.setTimeout(10);
   Serial3.setTimeout(10);
 }
 
