@@ -62,6 +62,39 @@ esp_ble_gattc_write_char(gattc_if, conn_id, char_handle, value_len, value, write
 → ESP_GATTC_WRITE_CHAR_EVT (confirmation)
 ```
 
+## Message Length and MTU Limitations
+
+### BLE MTU Configuration
+
+The ESP32 requests a large MTU to support longer messages:
+
+```c
+// In app_main() - line 540
+esp_ble_gatt_set_local_mtu(500);  // Request 500-byte MTU
+```
+
+**MTU Negotiation:**
+1. ESP32 requests 500-byte MTU via `esp_ble_gatt_set_local_mtu()`
+2. Upon connection, sends MTU request: `esp_ble_gattc_send_mtu_req()` (line 159)
+3. Negotiated MTU is logged in `ESP_GATTC_CFG_MTU_EVT` (line 187)
+
+**HM-10 Limitation:**
+
+Despite the ESP32's 500-byte MTU request, the **HM-10 module is limited to 20-byte packets** due to:
+- Default BLE 4.0 ATT MTU of 23 bytes (20 usable after 3-byte overhead)
+- HM-10 does not support MTU negotiation
+- Each BLE notification is limited to 20 bytes
+
+**Impact:**
+- Messages longer than 20 bytes are fragmented by the HM-10
+- Each 20-byte fragment arrives as a separate `ESP_GATTC_NOTIFY_EVT`
+- The Python client must reassemble fragments
+
+**Buffer Sizes:**
+- UART buffer: 1024 bytes (can receive long messages from computer)
+- BLE packet: 20 bytes (HM-10 limitation)
+- Each fragment logged separately with `bt_com` tag
+
 ## UART VCP Layer
 
 ### 6. UART Configuration
@@ -71,10 +104,15 @@ UART uses the default USB-Serial port (UART0) with the following settings:
 ```c
 #define UART_PORT_NUM              UART_NUM_0
 #define UART_BAUD_RATE             115200
-#define UART_BUF_SIZE              1024
+#define UART_BUF_SIZE              1024        // Can receive long messages
 ```
 
 Configuration: 8 data bits, no parity, 1 stop bit, no flow control.
+
+**Buffer capacity:**
+- RX buffer: 2048 bytes (UART_BUF_SIZE × 2, set in `uart_driver_install()`)
+- Static buffer: 1024 bytes (`uart_data[UART_BUF_SIZE]`)
+- Reads up to 1023 bytes per cycle (UART_BUF_SIZE - 1)
 
 ### 7. UART RX Task
 
