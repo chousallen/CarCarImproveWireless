@@ -1,3 +1,14 @@
 **/.vscode/
 **/build/
 **/.devcontainer/
+
+# ESP-IDF build artifacts
+**/sdkconfig
+**/sdkconfig.old
+dependencies.lock
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/*.egg-info/

@@ -1,0 +1,15 @@
+idf_component_register(
+    SRCS
+        "src/ble_bridge.c"
+        "src/ble_gattc.c"
+        "src/transceiver.c"
+        "src/bleak.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_REQUIRES
+        nvs_flash
+        driver
+    REQUIRES
+        bt
+        esp_common
+)
