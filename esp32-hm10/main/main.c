@@ -130,7 +130,11 @@ static esp_err_t load_device_name_from_nvs(char* device_name, size_t max_len)
     esp_err_t err;
 
     err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
-    if (err != ESP_OK) {
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        // Namespace doesn't exist yet - this is normal on first boot
+        ESP_LOGI(TAG, "NVS namespace not found, using default device name: %s", device_name);
+        return ESP_OK;
+    } else if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
         return err;
     }
@@ -153,6 +157,7 @@ static esp_err_t load_device_name_from_nvs(char* device_name, size_t max_len)
         }
     } else if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "Device name not found in NVS, using default: %s", device_name);
+        err = ESP_OK;  // Not an error - just use default
     } else {
         ESP_LOGE(TAG, "Error getting device name size: %s", esp_err_to_name(err));
     }
@@ -164,22 +169,16 @@ static esp_err_t load_device_name_from_nvs(char* device_name, size_t max_len)
 // UART receive task - reads user input and sends to BLE
 static void uart_rx_task(void *arg)
 {
+    static char mes_buff[11];
     while (1) {
-        int len = uart_read_bytes(UART_PORT_NUM, uart_data, UART_BUF_SIZE - 1, 20 / portTICK_PERIOD_MS);
+        int len = uart_read_bytes(UART_PORT_NUM, uart_data, 10, 10 / portTICK_PERIOD_MS);
 
         if (len > 0) {
-            uart_data[len] = '\0';  // Null terminate for safety
-
-            // Trim trailing CR/LF for command parsing
-            char *cmd = (char *)uart_data;
-            size_t cmd_len = strlen(cmd);
-            while (cmd_len > 0 && (cmd[cmd_len - 1] == '\r' || cmd[cmd_len - 1] == '\n')) {
-                cmd[cmd_len - 1] = '\0';
-                cmd_len--;
-            }
+            memcpy(mes_buff, uart_data, len);
+            mes_buff[len] = '\0';  // Null terminate for safety
 
             // Handle AT+RESET (reply then reset)
-            if (strcmp(cmd, "AT+RESET") == 0) {
+            if (strcmp(mes_buff, "AT+RESET") == 0) {
                 ESP_LOGI(TAG_BT_COM, "OK+RESET");
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 esp_restart();
@@ -187,15 +186,25 @@ static void uart_rx_task(void *arg)
             }
 
             // Handle AT+NAME? query
-            if (strcmp(cmd, "AT+NAME?") == 0) {
+            if (strcmp(mes_buff, "AT+NAME?") == 0) {
                 ESP_LOGI(TAG_BT_COM, "OK+NAME%s", target_device_name);
                 continue;
             }
 
+            // Handle AT+STATUS? query
+            if (strcmp(mes_buff, "AT+STATUS?") == 0) {
+                if (connect) {
+                    ESP_LOGI(TAG_BT_COM, "OK+CONN");
+                } else {
+                    ESP_LOGI(TAG_BT_COM, "OK+UNCONN");
+                }
+                continue;
+            }
+
             // Check if this is an AT command
-            if (strncmp(cmd, AT_CMD_PREFIX, strlen(AT_CMD_PREFIX)) == 0) {
+            if (strncmp(mes_buff, AT_CMD_PREFIX, strlen(AT_CMD_PREFIX)) == 0) {
                 // Extract device name after AT+NAME
-                char* new_name = (char*)cmd + strlen(AT_CMD_PREFIX);
+                char* new_name = (char*)mes_buff + strlen(AT_CMD_PREFIX);
                 size_t name_len = strlen(new_name);
 
                 if (name_len > 0 && name_len < MAX_DEVICE_NAME_LEN) {
@@ -226,14 +235,14 @@ static void uart_rx_task(void *arg)
                     gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
                     gl_profile_tab[PROFILE_A_APP_ID].conn_id,
                     gl_profile_tab[PROFILE_A_APP_ID].char_handle,
-                    len,
-                    uart_data,
+                    len+1,
+                    (uint8_t*)mes_buff,
                     ESP_GATT_WRITE_TYPE_RSP,
                     ESP_GATT_AUTH_REQ_NONE
                 );
             }
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(25 / portTICK_PERIOD_MS);
     }
 }
 
@@ -249,10 +258,12 @@ static void uart_init(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    // Install UART driver
-    uart_driver_install(UART_PORT_NUM, UART_BUF_SIZE * 2, 0, 0, NULL, 0);
-    uart_param_config(UART_PORT_NUM, &uart_config);
-    uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    // Configure UART parameters
+    ESP_ERROR_CHECK(uart_param_config(UART_PORT_NUM, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    
+    // Install UART driver with larger buffers and no event queue
+    ESP_ERROR_CHECK(uart_driver_install(UART_PORT_NUM, UART_BUF_SIZE * 2, UART_BUF_SIZE * 2, 0, NULL, 0));
 
     // Create UART receive task
     xTaskCreate(uart_rx_task, "uart_rx_task", UART_RX_TASK_STACK_SIZE, NULL, UART_RX_TASK_PRIORITY, NULL);
