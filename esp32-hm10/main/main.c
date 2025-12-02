@@ -171,11 +171,25 @@ static void uart_rx_task(void *arg)
 {
     static char mes_buff[11];
     while (1) {
+        // MTU of HM-10 is only 23bytes. The string can be at most 20bytes in UTF-8. So we read max 10 chars here.
         int len = uart_read_bytes(UART_PORT_NUM, uart_data, 10, 10 / portTICK_PERIOD_MS);
 
         if (len > 0) {
             memcpy(mes_buff, uart_data, len);
             mes_buff[len] = '\0';  // Null terminate for safety
+
+            // Check if this is an AT+NAME command (needs more data)
+            if (strncmp(mes_buff, AT_CMD_PREFIX, strlen(AT_CMD_PREFIX)) == 0) {
+                // Read the rest of the device name (up to MAX_DEVICE_NAME_LEN + prefix length)
+                int additional_len = uart_read_bytes(UART_PORT_NUM, uart_data + len, 
+                                                    MAX_DEVICE_NAME_LEN - len, 
+                                                    10 / portTICK_PERIOD_MS);
+                if (additional_len > 0) {
+                    len += additional_len;
+                    memcpy(mes_buff, uart_data, len);
+                    mes_buff[len] = '\0';
+                }
+            }
 
             // Handle AT+RESET (reply then reset)
             if (strcmp(mes_buff, "AT+RESET") == 0) {
