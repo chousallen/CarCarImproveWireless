@@ -621,6 +621,12 @@ static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp
 
 void app_main(void)
 {
+    // Set default log level to WARNING
+    esp_log_level_set("*", ESP_LOG_WARN);
+    
+    // Set bt_com log level to INFO to see BLE communication
+    esp_log_level_set(TAG_BT_COM, ESP_LOG_INFO);
+    
     ESP_LOGI(TAG, "Starting BLE GATT Client for HM-10");
 
     // Initialize UART first for user feedback
