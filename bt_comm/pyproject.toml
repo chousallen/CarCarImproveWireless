@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bt_comm"
+version = "1.0.0"
+description = "Bluetooth communication bridge from PC to HM-10 via Bleak or ESP32"
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [
+    {name = "sallen", email = "b12901148@ntu.edu.tw"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Communications",
+    "Topic :: System :: Hardware",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "bleak>=0.21.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "flake8>=6.0",
+]
+
+[project.scripts]
+bt_comm = "bt_comm.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/chousallen/CarCarImproveWireless"
+Repository = "https://github.com/chousallen/CarCarImproveWireless"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bt_comm*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py37", "py38", "py39", "py310", "py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

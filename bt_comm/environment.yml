@@ -1,0 +1,10 @@
+name: bt_comm
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - bleak>=0.21.0
+      - pyserial>=3.5
