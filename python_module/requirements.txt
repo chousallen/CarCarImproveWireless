@@ -1,4 +1,0 @@
-# Python dependencies for BT Bridge module
-
-pyserial>=3.5
-bleak>=0.21.0
