@@ -1,3 +1,3 @@
-from .hm10_esp32_bridge import ESP32HM10Bridge
+from .hm10_esp32_bridge import HM10ESP32Bridge
 
-__all__ = ['ESP32HM10Bridge']
+__all__ = ['HM10ESP32Bridge']
