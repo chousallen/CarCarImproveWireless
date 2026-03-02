@@ -58,15 +58,15 @@ void setup() {
   Serial.println("Enabling notifications...");
   sendATCommand("AT+NOTI1"); // Notify when link is established/lost
 
-  // 6. Restart the module to apply changes
+  // 6. Get the Bluetooth MAC Address
+  Serial.println("Querying Bluetooth Address");
+  sendATCommand("AT+ADDR?");
+
+  // 7. Restart the module to apply changes
   Serial.println("Restarting module...");
   sendATCommand("AT+RESET"); // Restart the module
   delay(1000);
   Serial3.begin(9600); // Now the module would use baudrate 9600
-
-  // 7. Get the Bluetooth MAC Address
-  Serial.println("Querying Bluetooth Address...");
-  sendATCommand("AT+ADDR?"); // [5]
   
   Serial.println("Initialization Complete.");
 }
@@ -117,13 +117,8 @@ void sendATCommand(const char* command) {
  */
 bool waitForResponse(const char* expected, unsigned long timeout) {
   unsigned long start = millis();
-  String response = "";
-  while (millis() - start < timeout) {
-    while (Serial3.available()) {
-      char c = Serial3.read();
-      response += c;
-    }
-  }
+  Serial3.setTimeout(timeout);
+  String response = Serial3.readString();
   if (response.length() > 0) {
     Serial.print("HM10 Response: ");
     Serial.println(response);
