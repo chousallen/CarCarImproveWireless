@@ -249,7 +249,7 @@ static void uart_rx_task(void *arg)
                     gl_profile_tab[PROFILE_A_APP_ID].gattc_if,
                     gl_profile_tab[PROFILE_A_APP_ID].conn_id,
                     gl_profile_tab[PROFILE_A_APP_ID].char_handle,
-                    len+1,
+                    len,
                     (uint8_t*)mes_buff,
                     ESP_GATT_WRITE_TYPE_RSP,
                     ESP_GATT_AUTH_REQ_NONE
