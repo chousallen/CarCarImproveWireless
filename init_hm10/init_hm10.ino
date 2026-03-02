@@ -21,6 +21,7 @@ void setup() {
     Serial.println(baudRates[i]);
     
     Serial3.begin(baudRates[i]);
+    Serial3.setTimeout(100);
     delay(100);
 
     // 2. Force Disconnection
@@ -73,7 +74,7 @@ void setup() {
 void loop() {
   // 1. Module to PC: Forward HM-10 responses to the Serial Monitor
   if (Serial3.available()) {
-    Serial.write(Serial3.read());
+    Serial.println(Serial3.readString());
   }
 
   // 2. PC to Module: Read user input and truncate line endings
