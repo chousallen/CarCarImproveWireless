@@ -15,7 +15,9 @@ This module provides a robust, asynchronous GATT client designed to interface di
 
 ### Installation
 
-#### 1. Miniconda (Recommended)
+#### 1. Miniconda 
+
+[Install Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) if you don't have it already.
 
 Create a clean environment using **Python 3.12** (recommended version):
 
