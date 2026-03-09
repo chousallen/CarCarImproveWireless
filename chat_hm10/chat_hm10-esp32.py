@@ -46,8 +46,9 @@ def main():
             user_msg = input("You: ")
             if user_msg.lower() in ['exit', 'quit']: break
             if user_msg: bridge.send(user_msg)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         pass
+    
     print("\nChat closed.")
 
 if __name__ == "__main__":

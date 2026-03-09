@@ -19,12 +19,18 @@ async def receive_task(hm10):
 async def send_task(hm10):
     """Task that waits for user input and sends it."""
     loop = asyncio.get_running_loop()
-    print("--- Chat Started. Type 'exit' to quit. ---")
+    print("--- Chat Started. Type 'exit' to quit or press Ctrl+D/Ctrl+C. ---")
     
     while True:
         print("You: ", end="", flush=True)
         # sys.stdin.readline blocks this thread until Enter is pressed
         user_msg = await loop.run_in_executor(None, sys.stdin.readline)
+        
+        # Handle EOF (Ctrl+D on Linux/Mac, Ctrl+Z on Windows)
+        if not user_msg:
+            print("\nEOF detected. Exiting...")
+            return
+        
         user_msg = user_msg.strip()
 
         if user_msg.lower() in ['exit', 'quit']:
@@ -58,4 +64,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         # Handle Ctrl+C gracefully
+        print("\nKeyboard interrupt detected. Exiting...")
         pass
