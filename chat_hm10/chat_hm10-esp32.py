@@ -26,7 +26,9 @@ def main():
         if bridge.set_hm10_name(EXPECTED_NAME):
             print("✅ Name updated successfully. Resetting ESP32...")
             bridge.reset()
-            # Re-init after reset
+            # Close old connection before re-init
+            bridge.close()
+            time.sleep(0.5)  # Give OS time to release the port
             bridge = HM10ESP32Bridge(port=PORT)
         else:
             print("❌ Failed to set name. Exiting.")
@@ -46,8 +48,10 @@ def main():
             user_msg = input("You: ")
             if user_msg.lower() in ['exit', 'quit']: break
             if user_msg: bridge.send(user_msg)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         pass
+    finally:
+        bridge.close()
     print("\nChat closed.")
 
 if __name__ == "__main__":

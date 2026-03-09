@@ -86,3 +86,21 @@ class HM10ESP32Bridge:
     def send(self, text):
         """Sends data to be forwarded to HM-10 via GATT."""
         self.ser.write(text.encode('utf-8'))
+
+    def close(self):
+        """Explicitly close the serial port."""
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+
+    def __del__(self):
+        """Ensure serial port is closed when object is destroyed."""
+        self.close()
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures port is closed."""
+        self.close()
+        return False
