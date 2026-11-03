@@ -1,5 +1,8 @@
 menu "HM-10 BLE Bridge Configuration"
 
+    # NOTE: main.c does not read either option below. The target name is set at
+    # run time with AT+NAME<name> and kept in NVS. See ../README.md.
+
     config HM10_DEVICE_NAME
         string "Target HM-10 Device Name"
         default "HMSoft"

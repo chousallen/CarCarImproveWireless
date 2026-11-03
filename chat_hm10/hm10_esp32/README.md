@@ -8,27 +8,26 @@ This Python module provides a high-level interface to interact with an ESP32 act
 
 * **AT Command Parsing**: Handles specific commands implemented in the ESP32 firmware, including `AT+NAME`, `AT+STATUS`, and `AT+RESET`.
 * **Log Filtering**: Automatically strips ESP32 system logs and ANSI color escape codes to extract clean Bluetooth communication data.
-* **Automatic Concatenation**: Merges fragmented data packets (caused by the ESP32's 10-byte UART buffer) into single, readable strings.
+* **Record Reassembly**: Reassembles `bt_com` log records that arrive split across serial reads. Note that data still arrives in pieces: the HM-10 sends notifications of at most 20 bytes, and `listen()` returns whatever has arrived since the last call.
 * **NVS Support**: Interfaces with the ESP32's Non-Volatile Storage to query or update the target device name.
 
 ---
 
 ## Hardware Requirements
 
-* **ESP32**: Running the provided `main.c` firmware.
+* **ESP32**: Flashed with the `esp32-hm10/` firmware.
 * **HM-10 Bluetooth Module**: Configured to be discoverable by the ESP32.
-* **Connection**: ESP32 connected to PC via USB/UART (e.g., `/dev/ttyUSB2`).
+* **Connection**: ESP32 connected to PC via USB (e.g., `/dev/ttyUSB0` on Linux, `COM3` on Windows).
 
 ---
 
 ## Installation
 
-Ensure you have `pyserial` installed:
-
 ```bash
 pip install pyserial
-
 ```
+
+Or use the shared conda environment (`environment.yml` in the repo root), see [TA_GUIDE.md, section 4.1](../../TA_GUIDE.md#41-python-environment-both-paths). Run your script from `chat_hm10/` so `import hm10_esp32` resolves.
 
 ---
 
@@ -79,33 +78,16 @@ Closes the serial port. **Call it before creating a new `HM10ESP32Bridge` on the
 
 ## Example Usage
 
-### Simple Chat Script
-
-This example demonstrates a threaded approach to handle real-time bidirectional communication.
+The complete chat program is [`chat_hm10-esp32.py`](../chat_hm10-esp32.py): it checks the saved target name, sets it and resets the ESP32 if needed, then runs a listener thread next to the input loop. The minimum is:
 
 ```python
 from hm10_esp32 import HM10ESP32Bridge
-import threading
-import sys
 
-def background_listener(bridge):
-    while True:
-        msg = bridge.listen()
-        if msg:
-            print(f"\r[HM10]: {msg}\nYou: ", end="")
-
-bridge = HM10ESP32Bridge('/dev/ttyUSB2')
-
-# Verify connection before starting
+bridge = HM10ESP32Bridge('/dev/ttyUSB0')
 if bridge.get_status() == "CONNECTED":
-    threading.Thread(target=background_listener, args=(bridge,), daemon=True).start()
-    while True:
-        val = input("You: ")
-        bridge.send(val)
-else:
-    print("ESP32 is not connected to HM-10. Exiting.")
-    sys.exit(0)
-
+    bridge.send("Hello HM-10!")
+    print(bridge.listen())      # whatever the HM-10 sent since the last call
+bridge.close()
 ```
 
 ---

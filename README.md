@@ -1,444 +1,72 @@
-# CarCarImprove Wireless Communication System
+# CarCarImprove Wireless
 
-A complete wireless communication system using HM-10 BLE modules with ESP32 bridge capabilities for seamless PC-to-BLE data transfer.
+A Bluetooth Low Energy (BLE) link between a student's PC and a CarCar car (an Arduino Mega line-following car). The car carries an HM-10 BLE module wired to the Mega's Serial3. It replaces the HC-05 Bluetooth Classic modules, whose PC connections were unreliable.
 
-## Overview
-
-This project provides a full-stack solution for wireless communication between a PC and HM-10 Bluetooth Low Energy modules. It replaces the HC-05 Bluetooth Classic modules previously used on the CarCar cars, whose PC connections were unreliable. The system consists of firmware, Python libraries, and configuration tools that work together to enable transparent bidirectional communication.
-
-There are **two ways** for the PC to reach the HM-10 on the car:
-
-| Path | PC side | Needs | Use when |
-|------|---------|-------|----------|
-| **ESP32 bridge** | `chat_hm10/hm10_esp32` (pyserial) | An ESP32 flashed with `esp32-hm10` | The PC's own Bluetooth is missing or unreliable; the ESP32 shows up as a plain serial port on every OS |
-| **Direct BLE** | `chat_hm10/hm10_bleak` ([bleak](https://github.com/hbldh/bleak)) | A PC with BLE (Bluetooth 4.0+) | No extra hardware is wanted |
-
-New users should start with the [Beginner Guide](beginner_guide.md).
-
-### System Architecture
+The PC can reach the HM-10 in two ways:
 
 ```
-┌──────────┐     USB/UART       ┌──────────┐       BLE        ┌──────────┐
-│    PC    │ ◄────────────────► │  ESP32   │ ◄──────────────► │  HM-10   │
-│ (Python) │                    │ (Bridge) │                  │ (Module) │
-└──────────┘                    └──────────┘                  └──────────┘
-      ▲                                                             ▲
-      └──────────── BLE (direct path, hm10_bleak) ─────────────────┘
+┌──────────┐  USB serial  ┌──────────┐     BLE      ┌──────────┐  UART 9600  ┌──────────┐
+│    PC    │ ◄──────────► │  ESP32   │ ◄──────────► │  HM-10   │ ◄─────────► │   Mega   │
+│ (Python) │              │ (bridge) │              │ (on car) │             │  (car)   │
+└──────────┘              └──────────┘              └──────────┘             └──────────┘
+      ▲                                                   ▲
+      └──────── BLE, direct from the PC's own Bluetooth ──┘
 ```
 
-**Communication Flow:**
-1. PC sends data via USB serial to ESP32
-2. ESP32 acts as BLE GATT client and forwards data to HM-10
-3. HM-10 receives data via BLE characteristic writes
-4. HM-10 sends data back via BLE notifications
-5. ESP32 receives notifications and forwards to PC via USB serial
-
-## Project Components
-
-### 1. `esp32-hm10/` - ESP32 Firmware
-
-**Purpose:** BLE GATT Client firmware that turns the ESP32 into a transparent UART-to-BLE bridge.
-
-**Key Features:**
-- Automatic BLE scanning and connection to configured HM-10 devices
-- UART interface at 115200 baud for PC communication
-- Bidirectional data transfer (UART ↔ BLE)
-- AT command support for runtime configuration
-- Persistent device name storage (NVS)
-- Automatic reconnection on disconnect
-
-**Technology:**
-- Platform: ESP-IDF (Espressif IoT Development Framework)
-- Language: C
-- BLE Stack: Bluedroid
-
-**Documentation:** See [esp32-hm10/README.md](esp32-hm10/README.md) for detailed build, flash, and usage instructions.
-
-**Quick Start:**
-```bash
-cd esp32-hm10
-idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
-```
-
----
-
-### 2. `chat_hm10/hm10_esp32/` - Python Bridge Module
-
-**Purpose:** High-level Python interface for communicating with the ESP32 bridge, abstracting away low-level serial communication and log filtering.
-
-**Key Features:**
-- AT command parsing and handling
-- Automatic log filtering (strips ESP32 system logs and ANSI codes)
-- Data packet concatenation (merges fragmented HM-10 packets)
-- Status checking (connection state queries)
-- Device name configuration (NVS interface)
-
-**API Highlights:**
-```python
-from hm10_esp32 import HM10ESP32Bridge
-
-bridge = HM10ESP32Bridge('/dev/ttyUSB2')
-bridge.get_status()              # Check connection state
-bridge.get_hm10_name()           # Query target device name
-bridge.set_hm10_name('MyDevice') # Change target device
-bridge.send('Hello HM-10!')      # Send data to HM-10
-message = bridge.listen()        # Receive data from HM-10
-```
-
-**Documentation:** See [chat_hm10/hm10_esp32/README.md](chat_hm10/hm10_esp32/README.md)
-
-**Installation:**
-```bash
-pip install pyserial
-```
-
----
-
-### 3. `chat_hm10/chat_hm10-esp32.py` - Example Chat Application
-
-**Purpose:** Working example demonstrating real-time bidirectional communication using the Python bridge module.
-
-**Features:**
-- Threaded architecture for concurrent send/receive
-- Connection verification before starting
-- Live chat interface with clear message formatting
-- Graceful exit handling
-
-**Usage:**
-```bash
-cd chat_hm10
-python chat_hm10-esp32.py
-```
-
-**Requirements:**
-- ESP32 flashed with `esp32-hm10` firmware
-- HM-10 powered on and within range
-- ESP32 connected via USB (e.g., `/dev/ttyUSB2`)
-
-**Example Output:**
-```
-✅ Ready! Connected to HM10_Mega
---- Start Chatting (Type 'exit' to quit) ---
-You: Hello from PC!
-[HM10]: Hello from Arduino!
-You: How are you?
-[HM10]: Working great!
-```
-
----
-
-### 4. `chat_hm10/hm10_bleak/` and `chat_hm10/chat_hm10-bleak.py` - Direct BLE (no ESP32)
-
-**Purpose:** Talk to the HM-10 from the PC's own Bluetooth adapter using `bleak`, an asynchronous (asyncio) Python BLE library.
-
-**Key Features:**
-- Scans by device name and/or MAC address, then subscribes to `0xFFE1` notifications
-- Splits outgoing messages into 20-byte chunks with a 20 ms gap
-- `listen()` returns everything received since the last call
-
-**Usage:**
-```bash
-pip install bleak
-cd chat_hm10
-python chat_hm10-bleak.py   # target name is set in main(): HM10BleakClient(target_name="HM10_Mega")
-```
-
-**Documentation:** See [chat_hm10/hm10_bleak/README.md](chat_hm10/hm10_bleak/README.md)
-
----
-
-### 5. `init_hm10/` - HM-10 Configuration Utility
-
-**Purpose:** Arduino sketch for initializing and configuring HM-10 modules to work with the ESP32 bridge.
-
-**Features:**
-- Automatic baud rate detection (tests 9600-230400 baud)
-- Force disconnection from existing connections
-- Factory reset capability
-- Custom device name configuration
-- Connection notification setup
-- MAC address query
-
-**Configuration Steps:**
-1. Auto-detect HM-10 baud rate
-2. Force disconnect any active connections
-3. Restore factory defaults
-4. Set custom device name (configurable via macro)
-5. Enable connection notifications
-6. Reset module to apply changes
-7. Query and display Bluetooth MAC address
-
-**Usage:**
-1. Connect HM-10 to Arduino Mega Serial3. The course's board (HM-10 on a black 6-pin base board) has level shifters on TX/RX, so wire it directly. A bare module has 3.3 V logic on RX: put a divider on the Mega's TX3 (5 V)
-2. Edit `CUSTOM_NAME` in the sketch:
-   ```arduino
-   #define CUSTOM_NAME "HM10_Mega"  // Max 12 characters
-   ```
-3. Upload sketch and open Serial Monitor (115200 baud)
-4. Initialization will run automatically on startup
-5. Use Serial Monitor for manual AT commands if needed
-
-**Hardware Connections (Arduino Mega):**
-- HM-10 TX → Arduino RX3 (Pin 15)
-- HM-10 RX → Arduino TX3 (Pin 14)
-- HM-10 VCC → **5V** for the course's board (black base board with its own regulator, 3.6–6 V). A bare module needs **3.3V** (rated 2.5–3.3 V).
-- HM-10 GND → GND
-
-**Buying more HM-10 boards:** check that the board has level shifters on TX/RX. Listings often say only "with base board", and many base boards have a regulator but no level shifter. Ask the seller, or test one board on arrival: 5 V on VCC, other pins open. TX and RX near VCC (about 4.3 V on the course's board) means a level shifter; about 3.3 V means none, so add a divider on TX3.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-**Hardware:**
-- ESP32 development board with USB
-- HM-10 BLE module (properly configured)
-- Arduino Mega or compatible (for HM-10 initialization)
-- USB cables for programming and communication
-
-**Software:**
-- [ESP-IDF v6.1](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/) (the committed `sdkconfig` was generated by v6.1; 5.3 and newer also build; only needed to rebuild the firmware)
-- [Arduino IDE](https://www.arduino.cc/en/software) (for HM-10 setup)
-- Python 3.12 with `pyserial` (ESP32 path) and/or `bleak` (direct path). `conda env create -f environment.yml` installs both.
-
-### Setup Workflow
-
-#### Step 1: Initialize HM-10
-```bash
-# 1. Open init_hm10/init_hm10.ino in Arduino IDE
-# 2. Set your desired device name in CUSTOM_NAME
-# 3. Upload to Arduino Mega with HM-10 connected to Serial3
-# 4. Open Serial Monitor to verify initialization
-```
-
-#### Step 2: Flash ESP32
-```bash
-cd esp32-hm10
-idf.py build
-idf.py -p /dev/ttyUSB0 flash
-
-# Configure target device name (must match HM-10 name)
-idf.py -p /dev/ttyUSB0 monitor
-# In monitor, type: AT+NAMEHM10_Mega
-# Verify: AT+NAME?
-```
-
-#### Step 3: Test Communication
-```bash
-# Install Python dependencies
-pip install pyserial
-
-# Run chat application
-cd chat_hm10
-python chat_hm10-esp32.py
-```
-
----
-
-## Configuration
-
-### Changing Target HM-10 Device
-
-**Method 1 - Runtime (via AT commands):**
-```bash
-# Connect to ESP32 serial port
-screen /dev/ttyUSB0 115200
-
-# Change target device
-AT+NAMEMyDevice
-
-# Verify
-AT+NAME?
-
-# Reset to apply
-AT+RESET
-```
-
-**Method 2 - Python API:**
-```python
-from hm10_esp32 import HM10ESP32Bridge
-
-bridge = HM10ESP32Bridge('/dev/ttyUSB2')
-bridge.set_hm10_name('MyDevice')
-# Reset ESP32 manually after this
-```
-
-**Method 3 - Firmware default:**
-Edit `esp32-hm10/main/main.c`:
-```c
-static char target_device_name[MAX_DEVICE_NAME_LEN] = "MyDevice";
-```
-
-### Serial Port Configuration
-
-All components use 115200 baud by default:
-- **ESP32 UART:** 115200 baud (USB Virtual COM Port)
-- **Arduino Serial Monitor:** 115200 baud
-- **Python Bridge:** 115200 baud (configurable)
-
----
-
-## Troubleshooting
-
-### ESP32 Can't Find HM-10
-
-**Symptoms:** ESP32 never connects (`AT+STATUS?` replies `OK+UNCONN`)
-
-**Solutions:**
-1. Verify HM-10 is powered on and advertising. The ESP32 scans in 30 s rounds until it connects; each round that misses the HM-10 logs `Scan complete, <name> not found, scanning again`.
-2. Check device name matches: `AT+NAME?` on ESP32
-3. Use nRF Connect app to verify HM-10 visibility
-4. Ensure HM-10 is not connected to another device
-5. Check HM-10 is within BLE range (< 10 meters)
-
-### Data Not Received
-
-**Symptoms:** Sent data doesn't appear on the other side
-
-**Solutions:**
-1. Check connection status: `AT+STATUS?`
-2. Verify both devices are connected
-3. Check for transmission errors in logs
-4. Ensure data doesn't exceed MTU limits
-5. Filter logs: Look for `bt_com:` prefix
-
-### HM-10 Initialization Fails
-
-**Symptoms:** Arduino can't detect HM-10
-
-**Solutions:**
-1. Verify the supply suits the board: 5 V for the course's base board, 3.3 V for a bare module
-2. Check TX/RX connections (not swapped)
-3. Ensure Serial3 is available on your Arduino
-4. Try different baud rates manually
-5. Check HM-10 has stable power
-
-### Python Script Connection Timeout
-
-**Symptoms:** Script exits with "Status is DISCONNECTED"
-
-**Solutions:**
-1. Wait for ESP32 to complete connection (check monitor)
-2. Verify correct serial port in script
-3. Check ESP32 is flashed and running
-4. Ensure no other programs are using the serial port
-
----
-
-## BLE Technical Details
-
-### Service and Characteristic UUIDs
-
-- **Service UUID:** `0xFFE0` (HM-10 default UART service)
-- **Characteristic UUID:** `0xFFE1` (HM-10 UART characteristic)
-- **Properties:** Read, Write, Notify
-
-### MTU and Data Limitations
-
-- **HM-10 MTU:** 23 bytes (20 bytes usable payload)
-- **ESP32 UART Buffer:** 1024 bytes
-- **Fragmentation:** Messages > 20 bytes are split by HM-10
-- **Python Module:** Automatically concatenates fragments
-
-### Connection Parameters
-
-- **Scan Interval:** 80 ms (0x50)
-- **Scan Window:** 48 ms (0x30)
-- **Connection Interval:** Negotiated by BLE stack
-- **MTU Request:** 500 bytes (negotiated down to HM-10 limit)
-
----
-
-## Development
-
-### Repository Structure
+## Pick your guide
+
+| You are | Read | What you need to know first |
+|---|---|---|
+| A **student** using the link in the course | [beginner_guide.md](beginner_guide.md) | How to upload an Arduino sketch and run a Python script. Nothing about the ESP32 or BLE. |
+| A **TA** running the course | [TA_GUIDE.md](TA_GUIDE.md) | What each device and module does, how to set everything up from scratch, how to fix the usual problems. |
+| A **developer** changing the code | [DEV_GUIDE.md](DEV_GUIDE.md) | Everything in the TA guide, plus building the firmware, the internals, and the rules that must not be broken. |
+
+## Repository layout
 
 ```
 CarCarImprove/
 ├── README.md                      # This file
-├── environment.yml                # Conda environment (if applicable)
-├── esp32-hm10/                    # ESP32 firmware
-│   ├── main/
-│   │   ├── main.c                 # Main application
-│   │   └── Kconfig.projbuild      # menuconfig options (currently not read by main.c)
-│   ├── sdkconfig                  # Full build config (tracked on purpose)
-│   ├── sdkconfig.defaults
-│   ├── IMPLEMENTATION_NOTES.md
-│   ├── CMakeLists.txt
-│   └── README.md
+├── beginner_guide.md              # Student guide
+├── beginner_guide/                # Screenshots used by the student guide
+├── TA_GUIDE.md                    # TA guide: parts, setup, troubleshooting
+├── DEV_GUIDE.md                   # Developer guide: build, internals, invariants
+├── CLAUDE.md                      # Notes for AI coding assistants
+├── environment.yml                # Conda environment (Python 3.12, pyserial, bleak)
+├── esp32-hm10/                    # ESP32 bridge firmware (ESP-IDF, C)
+│   ├── main/main.c                # The whole firmware
+│   ├── main/Kconfig.projbuild     # menuconfig options (not read by main.c)
+│   ├── sdkconfig.defaults         # Lasting build settings (flash mode, log colours)
+│   ├── sdkconfig                  # Generated from the defaults by ESP-IDF v6.1 (tracked)
+│   ├── README.md                  # Firmware usage and how it works
+│   └── IMPLEMENTATION_NOTES.md    # BLE client internals
 ├── chat_hm10/                     # Python side (run scripts from this folder)
-│   ├── hm10_esp32/                # Module for the ESP32 path (pyserial)
-│   ├── hm10_bleak/                # Module for the direct BLE path (bleak)
+│   ├── hm10_esp32/                # Module for the ESP32 path (pyserial) + README
+│   ├── hm10_bleak/                # Module for the direct BLE path (bleak) + README
 │   ├── chat_hm10-esp32.py         # Chat example, ESP32 path
 │   └── chat_hm10-bleak.py         # Chat example, direct path
-├── init_hm10/                     # HM-10 setup utility
-│   └── init_hm10.ino              # Arduino sketch
-├── beginner_guide.md              # Step-by-step guide for students
-├── beginner_guide/                # Screenshots used by the guide
-└── resource/
-    └── DS-HM10.pdf                # HM-10 datasheet (AT command list)
+├── init_hm10/init_hm10.ino        # Arduino sketch that sets up a new HM-10
+├── tests/hw_e2e.py                # Hardware end-to-end test (needs real boards) + README
+└── resource/DS-HM10.pdf           # HM-10 datasheet (full AT command list)
 ```
 
-### Building from Source
+## All documents
 
-**ESP32 Firmware:**
-```bash
-cd esp32-hm10
-idf.py set-target esp32
-idf.py build
-```
+Guides, by audience:
 
-**Python Module:**
-```bash
-cd chat_hm10
-# Modules are ready to use without building
-pip install pyserial bleak
-```
+- [beginner_guide.md](beginner_guide.md): students
+- [TA_GUIDE.md](TA_GUIDE.md): TAs
+- [DEV_GUIDE.md](DEV_GUIDE.md): developers
 
----
+Reference for one component each:
 
-## Use Cases
-
-### 1. Wireless Serial Communication
-Replace wired serial connections with BLE for wireless debugging, logging, or control.
-
-### 2. IoT Data Collection
-Collect sensor data from Arduino/HM-10 devices wirelessly on your PC.
-
-### 3. Remote Control
-Send commands from PC to embedded devices via BLE.
-
-### 4. Multi-Device Bridge
-Connect multiple HM-10 devices by configuring multiple ESP32 bridges with different target names.
-
----
-
-## Related Documentation
-
-- [Beginner Guide](beginner_guide.md) - Student walkthrough
-- [HM10_Bleak Python Module README](chat_hm10/hm10_bleak/README.md) - Direct BLE API reference
-- [ESP32-HM10 Firmware README](esp32-hm10/README.md) - Detailed ESP32 documentation
-- [ESP32-HM10 Implementation Notes](esp32-hm10/IMPLEMENTATION_NOTES.md) - Technical details
-- [HM10_ESP32 Python Module README](chat_hm10/hm10_esp32/README.md) - Python API reference
-- [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)
-- [HM-10 Datasheet](resource/DS-HM10.pdf) - Local copy (official site: http://www.jnhuamao.cn/bluetooth.asp)
-
----
-
-## License
-
-This project is provided as-is for educational and development purposes.
+- [esp32-hm10/README.md](esp32-hm10/README.md): firmware usage, bridge commands, how it works, logging
+- [esp32-hm10/IMPLEMENTATION_NOTES.md](esp32-hm10/IMPLEMENTATION_NOTES.md): the BLE client code, event by event
+- [chat_hm10/hm10_esp32/README.md](chat_hm10/hm10_esp32/README.md): Python API for the ESP32 path
+- [chat_hm10/hm10_bleak/README.md](chat_hm10/hm10_bleak/README.md): Python API for the direct path
+- [tests/README.md](tests/README.md): how to run the hardware end-to-end test
+- [resource/DS-HM10.pdf](resource/DS-HM10.pdf): HM-10 datasheet (official site: http://www.jnhuamao.cn/bluetooth.asp)
+- [ESP-IDF programming guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/): the ESP32 build system and BLE API
 
 ## Contributing
 
-Contributions are welcome! Please ensure:
-- Code follows existing style conventions
-- Documentation is updated for any new features
-- Testing is performed on actual hardware
-
----
-
-**CarCarImprove Wireless** - Complete BLE communication solution for ESP32 and HM-10 modules
+Test every change on real boards: run the hardware end-to-end test in [tests/README.md](tests/README.md) for the ESP32 path, and test the rest by hand. There are no tests that run without hardware. Update the guide that describes what you changed. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/); see [DEV_GUIDE.md](DEV_GUIDE.md#9-git-conventions).

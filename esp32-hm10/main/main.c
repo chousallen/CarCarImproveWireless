@@ -1,6 +1,7 @@
 /*
  * BLE GATT Client for HM-10 Module
- * Connects to device "sallen_hm10" and interacts with its characteristic
+ * Scans for the HM-10 by the name saved in NVS (default "sallen_hm10" on a fresh board),
+ * connects, and bridges its 0xFFE1 characteristic to UART0. See ../README.md.
  */
 
 #include <stdio.h>
