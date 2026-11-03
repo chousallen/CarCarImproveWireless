@@ -169,7 +169,9 @@ static esp_err_t load_device_name_from_nvs(char* device_name, size_t max_len)
 // UART receive task - reads user input and sends to BLE
 static void uart_rx_task(void *arg)
 {
-    static char mes_buff[11];
+    // Normal reads are at most 10 bytes, but the AT+NAME path below reads up to
+    // MAX_DEVICE_NAME_LEN bytes in total, plus the terminating '\0'.
+    static char mes_buff[MAX_DEVICE_NAME_LEN + 1];
     while (1) {
         // MTU of HM-10 is only 23bytes. The string can be at most 20bytes in UTF-8. So we read max 10 chars here.
         int len = uart_read_bytes(UART_PORT_NUM, uart_data, 10, 10 / portTICK_PERIOD_MS);
