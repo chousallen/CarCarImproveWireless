@@ -24,7 +24,7 @@ This project enables an ESP32 to act as a BLE bridge between a computer (via USB
 
 ## Software Requirements
 
-- [ESP-IDF v5.0+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/)
+- [ESP-IDF v6.1](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/) (any version from 5.3 also builds)
 - Python 3.7+ (for ESP-IDF tools)
 
 ## Installation
