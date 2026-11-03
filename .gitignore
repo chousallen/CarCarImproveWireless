@@ -3,7 +3,7 @@
 **/.devcontainer/
 
 # ESP-IDF build artifacts
-**/sdkconfig
+# sdkconfig IS tracked: it holds menuconfig changes not in sdkconfig.defaults
 **/sdkconfig.old
 dependencies.lock
 
@@ -13,3 +13,6 @@ dependencies.lock
 
 # Distribution / packaging
 *.egg-info/
+
+# Local Python virtual environments
+**/*venv*/
