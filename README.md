@@ -170,7 +170,7 @@ python chat_hm10-bleak.py   # target name is set in main(): HM10BleakClient(targ
 7. Query and display Bluetooth MAC address
 
 **Usage:**
-1. Connect HM-10 to Arduino Mega Serial3 (HM-10 RX is 3.3 V logic; the Mega's TX3 is 5 V, so use a divider unless your board has a level shifter)
+1. Connect HM-10 to Arduino Mega Serial3. The course's board (HM-10 on a black 6-pin base board) has level shifters on TX/RX, so wire it directly. A bare module has 3.3 V logic on RX: put a divider on the Mega's TX3 (5 V)
 2. Edit `CUSTOM_NAME` in the sketch:
    ```arduino
    #define CUSTOM_NAME "HM10_Mega"  // Max 12 characters
@@ -182,8 +182,10 @@ python chat_hm10-bleak.py   # target name is set in main(): HM10BleakClient(targ
 **Hardware Connections (Arduino Mega):**
 - HM-10 TX → Arduino RX3 (Pin 15)
 - HM-10 RX → Arduino TX3 (Pin 14)
-- HM-10 VCC → depends on the board: **3.3V** for a bare module (rated 2.5–3.3 V), **5V** for a carrier board with its own regulator (usually 3.6–6 V). Check your board.
+- HM-10 VCC → **5V** for the course's board (black base board with its own regulator, 3.6–6 V). A bare module needs **3.3V** (rated 2.5–3.3 V).
 - HM-10 GND → GND
+
+**Buying more HM-10 boards:** check that the board has level shifters on TX/RX. Listings often say only "with base board", and many base boards have a regulator but no level shifter. Ask the seller, or test one board on arrival: 5 V on VCC, other pins open. TX and RX near VCC (about 4.3 V on the course's board) means a level shifter; about 3.3 V means none, so add a divider on TX3.
 
 ---
 
@@ -309,7 +311,7 @@ All components use 115200 baud by default:
 **Symptoms:** Arduino can't detect HM-10
 
 **Solutions:**
-1. Verify the supply suits the board: 3.3 V for a bare module, 3.6–6 V for a carrier board with a regulator
+1. Verify the supply suits the board: 5 V for the course's base board, 3.3 V for a bare module
 2. Check TX/RX connections (not swapped)
 3. Ensure Serial3 is available on your Arduino
 4. Try different baud rates manually

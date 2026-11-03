@@ -16,7 +16,7 @@ Connect the HM-10 Bluetooth module to your Arduino Mega as follows:
 
 | HM-10 Pin | Arduino Mega Pin |
 |-----------|------------------|
-| VCC       | 3.3V             |
+| VCC       | 5V               |
 | GND       | GND              |
 | TX        | RX3 (Pin 15)     |
 | RX        | TX3 (Pin 14)     |

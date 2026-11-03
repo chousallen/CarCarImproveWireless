@@ -39,7 +39,7 @@ void setup() {
   }
 
   if (!moduleReady) {
-    Serial.println("Failed to detect HM-10. Check 3.3V VCC and wiring.");
+    Serial.println("Failed to detect HM-10. Check VCC and wiring.");
     return;
   }
 
