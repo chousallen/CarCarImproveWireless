@@ -34,9 +34,9 @@ pip install pyserial
 
 ## API Reference
 
-### `ESP32HM10Bridge(port, baudrate=115200)`
+### `HM10ESP32Bridge(port, rx_timeout=0.1)`
 
-Initializes the serial connection. The default baud rate is **115200**.
+Opens the serial port at **115200** baud (fixed, matching the firmware). `rx_timeout` is the serial read timeout in seconds.
 
 ### `get_status()`
 
@@ -65,6 +65,16 @@ Sends raw text to the ESP32. If the ESP32 is connected to an HM-10, it forwards 
 
 Checks the UART buffer for incoming data from the HM-10. It filters out system logs and returns only the Bluetooth payload.
 
+### `reset()`
+
+Sends `AT+RESET` to reboot the ESP32, then waits about 6 s for it to reconnect to the HM-10. Returns `True` if `OK+RESET` was received.
+
+### `close()`
+
+Closes the serial port. **Call it before creating a new `HM10ESP32Bridge` on the same port** (for example after `reset()`). Windows refuses to open a COM port that is still open, and reports "Access is denied". The class also works as a context manager: `with HM10ESP32Bridge(port) as bridge: ...` closes the port on exit.
+
+> **How data reaches Python:** the firmware prints every HM-10 notification and every `OK+...` reply as an ESP-IDF log line tagged `bt_com:` at INFO level. `listen()` and the AT helpers keep only lines that contain `bt_com:`. If the firmware's log tag or log level changes, this module receives nothing.
+
 ---
 
 ## Example Usage
@@ -74,7 +84,7 @@ Checks the UART buffer for incoming data from the HM-10. It filters out system l
 This example demonstrates a threaded approach to handle real-time bidirectional communication.
 
 ```python
-from hm10_esp32_bridge import ESP32HM10Bridge
+from hm10_esp32 import HM10ESP32Bridge
 import threading
 import sys
 
@@ -84,7 +94,7 @@ def background_listener(bridge):
         if msg:
             print(f"\r[HM10]: {msg}\nYou: ", end="")
 
-bridge = ESP32HM10Bridge('/dev/ttyUSB2')
+bridge = HM10ESP32Bridge('/dev/ttyUSB2')
 
 # Verify connection before starting
 if bridge.get_status() == "CONNECTED":

@@ -17,6 +17,15 @@ This module provides a robust, asynchronous GATT client designed to interface di
 
 #### 1. Miniconda 
 
+The simplest option is the shared environment file in the repo root, which installs both `bleak` and `pyserial`:
+
+```bash
+conda env create -f environment.yml   # run from the repo root
+conda activate carcar
+```
+
+Or create one by hand:
+
 [Install Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) if you don't have it already.
 
 Create a clean environment using **Python 3.12** (recommended version):

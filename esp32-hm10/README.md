@@ -208,6 +208,10 @@ Edit the default device name in [main/main.c](main/main.c):
 static char target_device_name[MAX_DEVICE_NAME_LEN] = "sallen_hm10";
 ```
 
+This default is used only until a name is saved with `AT+NAME`. After that, the name in NVS (the ESP32's non-volatile key-value flash storage) wins, even across reflashes. Run `idf.py erase-flash` to clear it.
+
+> **Note:** `main/Kconfig.projbuild` and `sdkconfig.defaults` define `CONFIG_HM10_DEVICE_NAME` (`HMSoft`) and `CONFIG_HM10_DEVICE_MAC`, but `main.c` never reads them. Setting them in `idf.py menuconfig` has no effect.
+
 ### Changing UUIDs
 
 If your HM-10 uses different UUIDs, modify these macros:

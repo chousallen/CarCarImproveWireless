@@ -14,7 +14,7 @@ The application uses the GAP (Generic Access Profile) callback to scan for devic
 esp_gap_cb() -> ESP_GAP_BLE_SCAN_RESULT_EVT
 ```
 
-When a device is found, it checks the advertised name against `DEVICE_NAME` ("sallen_hm10"). If matched, it stops scanning and initiates a connection.
+When a device is found, it checks the advertised name against `target_device_name` (loaded from NVS at boot; default "sallen_hm10"). If matched, it stops scanning and initiates a connection.
 
 ### 2. Connection Flow
 
@@ -213,7 +213,7 @@ Always `free()` these after use to prevent memory leaks.
 
 ## Customization Points
 
-1. **Device Name**: Change `DEVICE_NAME` macro
+1. **Device Name**: Change the `target_device_name` default in `main.c`, or send `AT+NAME<name>` at runtime
 2. **Service UUID**: Change `REMOTE_SERVICE_UUID` macro
 3. **Characteristic UUID**: Change `REMOTE_NOTIFY_CHAR_UUID` macro
 4. **Write Data**: Modify the write data in `ESP_GATTC_READ_CHAR_EVT` case
