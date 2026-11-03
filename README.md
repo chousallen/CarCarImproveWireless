@@ -288,12 +288,11 @@ All components use 115200 baud by default:
 **Symptoms:** ESP32 never connects (`AT+STATUS?` replies `OK+UNCONN`)
 
 **Solutions:**
-1. Send `AT+RESET` (or replug the ESP32). After boot or a disconnect it scans for only **30 s** and does not start a new scan by itself, so an HM-10 powered on later is never found.
-2. Verify HM-10 is powered on and advertising
-3. Check device name matches: `AT+NAME?` on ESP32
-4. Use nRF Connect app to verify HM-10 visibility
-5. Ensure HM-10 is not connected to another device
-6. Check HM-10 is within BLE range (< 10 meters)
+1. Verify HM-10 is powered on and advertising. The ESP32 scans in 30 s rounds until it connects; each round that misses the HM-10 logs `Scan complete, <name> not found, scanning again`.
+2. Check device name matches: `AT+NAME?` on ESP32
+3. Use nRF Connect app to verify HM-10 visibility
+4. Ensure HM-10 is not connected to another device
+5. Check HM-10 is within BLE range (< 10 meters)
 
 ### Data Not Received
 

@@ -573,7 +573,14 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             }
             break;
         case ESP_GAP_SEARCH_INQ_CMPL_EVT:
-            ESP_LOGI(TAG, "Scan complete");
+            // The 30 s scan ended. If the target was not found, scan again so
+            // an HM-10 powered on later is still found.
+            if (!connect) {
+                ESP_LOGI(TAG, "Scan complete, %s not found, scanning again", target_device_name);
+                esp_ble_gap_start_scanning(30);
+            } else {
+                ESP_LOGI(TAG, "Scan complete");
+            }
             break;
         default:
             break;
