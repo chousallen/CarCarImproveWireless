@@ -73,7 +73,7 @@ Sends `AT+RESET` to reboot the ESP32, then waits about 6 s for it to reconnect t
 
 Closes the serial port. **Call it before creating a new `HM10ESP32Bridge` on the same port** (for example after `reset()`). Windows refuses to open a COM port that is still open, and reports "Access is denied". The class also works as a context manager: `with HM10ESP32Bridge(port) as bridge: ...` closes the port on exit.
 
-> **How data reaches Python:** the firmware prints every HM-10 notification and every `OK+...` reply as an ESP-IDF log line tagged `bt_com:` at INFO level. `listen()` and the AT helpers keep only lines that contain `bt_com:`. If the firmware's log tag or log level changes, this module receives nothing.
+> **How data reaches Python:** the firmware prints every HM-10 notification and every `OK+...` reply as an ESP-IDF log line tagged `bt_com:` at INFO level. `listen()` and the AT helpers keep only records tagged `bt_com:`. A record ends at the log's colour-reset code (`ESC[0m`) followed by `\r\n`, so a payload may contain newlines and keeps its spaces. A record split across two serial reads is kept until its end arrives. If the firmware's log tag or log level changes, or log colours are turned off (`CONFIG_LOG_COLORS`), this module receives nothing.
 
 ---
 

@@ -5,25 +5,36 @@ import re
 class HM10ESP32Bridge:
     def __init__(self, port, rx_timeout=0.1):
         self.ser = serial.Serial(port=port, baudrate=115200, timeout=rx_timeout)
-        # Matches 'bt_com' tag logs from ESP32
-        self.log_regex = re.compile(r'bt_com:\s*(.*)')
-        # Strips ANSI color codes often sent by ESP-IDF
-        self.ansi_regex = re.compile(r'\x1b\[[0-9;]*m')
-        time.sleep(1) 
+        # ESP-IDF log record: ESC[0;32mI (<ms>) bt_com: <payload>ESC[0m\r\n
+        # The payload may itself contain newlines, so the record ends at the
+        # colour-reset code, not at the first line break.
+        self.record_start = re.compile(rb'\x1b\[[0-9;]*m[A-Z] \(\d+\) bt_com: ')
+        self.record_end = b'\x1b[0m\r\n'
+        # Bytes read from the port that do not yet form a complete record
+        self._rx_buf = b''
+        time.sleep(1)
 
     def _read_bt_com_payloads(self):
-        """Reads and cleans all 'bt_com' tagged logs currently in buffer."""
-        if self.ser.in_waiting == 0:
-            return []
-        raw_data = self.ser.read_all().decode('utf-8', errors='ignore')
-        lines = raw_data.splitlines()
+        """Returns the payloads of all complete 'bt_com' records received so far."""
+        if self.ser.in_waiting:
+            self._rx_buf += self.ser.read_all()
         payloads = []
-        for line in lines:
-            match = self.log_regex.search(line)
-            if match:
-                # Clean ANSI colors and whitespace
-                clean_payload = self.ansi_regex.sub('', match.group(1)).strip()
-                payloads.append(clean_payload)
+        while True:
+            start = self.record_start.search(self._rx_buf)
+            if not start:
+                # Keep a record start that is still arriving; drop other output
+                esc = self._rx_buf.rfind(b'\x1b')
+                self._rx_buf = self._rx_buf[esc:] if esc >= 0 else b''
+                break
+            end = self._rx_buf.find(self.record_end, start.end())
+            if end < 0:
+                self._rx_buf = self._rx_buf[start.start():]
+                break
+            payload = self._rx_buf[start.end():end]
+            # The ESP32 sends each '\n' in the payload as '\r\n'; undo that
+            payload = payload.replace(b'\r\n', b'\n')
+            payloads.append(payload.decode('utf-8', errors='ignore'))
+            self._rx_buf = self._rx_buf[end + len(self.record_end):]
         return payloads
 
     def set_hm10_name(self, name, timeout=2.0):
