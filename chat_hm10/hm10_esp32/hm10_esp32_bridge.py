@@ -76,14 +76,20 @@ class HM10ESP32Bridge:
             time.sleep(0.01)
         return "TIMEOUT"
 
-    def reset(self):
-        """Triggers AT+RESET and returns True if OK+RESET is received."""
+    def reset(self, connect_timeout=15.0):
+        """Triggers AT+RESET and returns True if OK+RESET is received.
+        Then waits up to connect_timeout seconds until the ESP32 reports
+        OK+CONN (link to the HM-10 ready for data)."""
         self.ser.write(b"AT+RESET")
         start_time = time.time()
         while (time.time() - start_time) < 10.0:
             for entry in self._read_bt_com_payloads():
                 if "OK+RESET" in entry:
-                    time.sleep(6) # Wait for ESP32 to reboot and connect to HM-10
+                    time.sleep(1)  # let the ESP32 reboot before querying it
+                    deadline = time.time() + connect_timeout
+                    while time.time() < deadline:
+                        if self.get_status(timeout=0.5) == "CONNECTED":
+                            break
                     return True
             time.sleep(0.01)
         return False

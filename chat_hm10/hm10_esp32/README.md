@@ -67,7 +67,7 @@ Checks the UART buffer for incoming data from the HM-10. It filters out system l
 
 ### `reset()`
 
-Sends `AT+RESET` to reboot the ESP32, then waits about 6 s for it to reconnect to the HM-10. Returns `True` if `OK+RESET` was received.
+Sends `AT+RESET` to reboot the ESP32, then waits until `get_status()` reports `CONNECTED` (at most `connect_timeout`, default 15 s). Returns `True` if `OK+RESET` was received.
 
 ### `close()`
 

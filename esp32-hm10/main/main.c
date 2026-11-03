@@ -68,7 +68,8 @@ static struct gattc_profile_inst gl_profile_tab[PROFILE_NUM] = {
     },
 };
 
-static bool connect = false;
+static bool connect = false;      // set when the target is found; blocks a second open
+static bool link_ready = false;   // set once notifications are enabled; data can flow both ways
 static bool get_service = false;
 // static esp_gatt_srvc_id_t remote_service_id;
 // static esp_gatt_id_t remote_char_id;
@@ -209,7 +210,7 @@ static void uart_rx_task(void *arg)
 
             // Handle AT+STATUS? query
             if (strcmp(mes_buff, "AT+STATUS?") == 0) {
-                if (connect) {
+                if (link_ready) {
                     ESP_LOGI(TAG_BT_COM, "OK+CONN");
                 } else {
                     ESP_LOGI(TAG_BT_COM, "OK+UNCONN");
@@ -241,8 +242,8 @@ static void uart_rx_task(void *arg)
                 continue;
             }
 
-            // Check if BLE is connected and we have a valid characteristic handle
-            if (connect && gl_profile_tab[PROFILE_A_APP_ID].char_handle != INVALID_HANDLE) {
+            // Send only once notifications are enabled (characteristic found, link ready)
+            if (link_ready) {
                 // Log sent data with bt_com TAG
                 // ESP_LOGI(TAG_BT_COM, "%s", uart_data);
 
@@ -256,6 +257,8 @@ static void uart_rx_task(void *arg)
                     ESP_GATT_WRITE_TYPE_RSP,
                     ESP_GATT_AUTH_REQ_NONE
                 );
+            } else {
+                ESP_LOGW(TAG, "HM-10 link not ready, dropped %d bytes", len);
             }
         }
         vTaskDelay(25 / portTICK_PERIOD_MS);
@@ -508,11 +511,13 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             ESP_LOGE(TAG, "WRITE descr failed, error status = %x", p_data->write.status);
         } else {
             ESP_LOGI(TAG, "WRITE descr success - Notifications enabled");
+            link_ready = true;
         }
         break;
 
     case ESP_GATTC_DISCONNECT_EVT:
         connect = false;
+        link_ready = false;
         get_service = false;
         ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", p_data->disconnect.reason);
         ESP_LOGI(TAG, "Disconnected. Restarting scan to reconnect...");

@@ -179,6 +179,8 @@ I (12345) bt_com: Hello from HM-10!
 
 **Note:** AT commands are processed locally by the ESP32 and not forwarded to the HM-10.
 
+`OK+CONN` means the link is ready for data: the HM-10 was found, connected, and its notifications are enabled. Data sent over UART before that is dropped, and the ESP32 logs `HM-10 link not ready, dropped N bytes`.
+
 ## Configuration
 
 ### Default Settings
