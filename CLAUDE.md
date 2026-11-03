@@ -26,3 +26,5 @@
   `link_ready` is dropped with a `link not ready` warning. Reconnect after `AT+RESET` takes about 6.3 s.
 - The bench Arduino Mega runs a plain pass-through (USB `Serial` at 115200 ↔ `Serial3`/HM-10), not
   `init_hm10.ino`: it prints no banner, and opening its port does not reset the HM-10.
+- Hardware test: `python tests/hw_e2e.py --esp /dev/ttyUSB0 --mega /dev/ttyUSB1` (conda env `carcar`,
+  ~2 min, 22 checks, exit 0 = pass). See `tests/README.md` for the bench setup.
