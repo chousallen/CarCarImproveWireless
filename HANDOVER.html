@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarCar Wireless Handover</title>
+<style>
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --text: #1d1f23; --muted: #5d636e;
+  --line: #e2dfd8; --accent: #1f5fae; --accent-soft: #e7eef8;
+  --warn: #9a5b00; --warn-soft: #fdf3e1; --bad: #a3262a; --bad-soft: #fbeaea;
+  --ok: #1d6b3a; --ok-soft: #e6f4ea; --code-bg: #f2f0eb;
+  --fill: #7a3fb0; --fill-soft: #f3ecfa;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1c1f24; --text: #e6e6e3; --muted: #9aa0a9;
+    --line: #2f333a; --accent: #7fb0f0; --accent-soft: #1e2a3a;
+    --warn: #f0b45a; --warn-soft: #2e2518; --bad: #f08a8d; --bad-soft: #321c1d;
+    --ok: #7fd29b; --ok-soft: #18291f; --code-bg: #24272d;
+    --fill: #c9a2f0; --fill-soft: #2a2135;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1c1f24; --text: #e6e6e3; --muted: #9aa0a9;
+  --line: #2f333a; --accent: #7fb0f0; --accent-soft: #1e2a3a;
+  --warn: #f0b45a; --warn-soft: #2e2518; --bad: #f08a8d; --bad-soft: #321c1d;
+  --ok: #7fd29b; --ok-soft: #18291f; --code-bg: #24272d;
+  --fill: #c9a2f0; --fill-soft: #2a2135;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 32px 16px 80px; display: grid; gap: 40px; grid-template-columns: 220px minmax(0, 1fr); }
+nav.toc { position: sticky; top: 24px; align-self: start; font-size: 14px; }
+nav.toc b { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--line); }
+nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+main { min-width: 0; }
+header h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em; }
+header p.sub { color: var(--muted); margin: 0 0 20px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: var(--muted); padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.meta span b { color: var(--text); font-weight: 600; }
+h2 { font-size: 22px; margin: 48px 0 12px; padding-top: 8px; scroll-margin-top: 16px; }
+h3 { font-size: 17px; margin: 28px 0 8px; }
+p, li { max-width: 72ch; }
+a { color: var(--accent); }
+code, pre, kbd { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.88em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; }
+.tablewrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; background: var(--surface); }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 13px; color: var(--muted); font-weight: 600; background: var(--bg); }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+.callout.fill { border-color: var(--fill); background: var(--fill-soft); }
+.callout p { margin: 4px 0; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.ok { color: var(--ok); background: var(--ok-soft); }
+.tag.warn { color: var(--warn); background: var(--warn-soft); }
+.tag.bad { color: var(--bad); background: var(--bad-soft); }
+.tag.fill { color: var(--fill); background: var(--fill-soft); }
+.fillbox { border: 2px dashed var(--fill); border-radius: 8px; padding: 6px 12px; color: var(--fill); background: var(--fill-soft); }
+figure { margin: 16px 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+figure svg { width: 100%; height: auto; display: block; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
+svg .box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .t { fill: var(--text); font: 600 14px system-ui, sans-serif; }
+svg .s { fill: var(--muted); font: 12px system-ui, sans-serif; }
+svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; }
+svg .ln2 { stroke: var(--warn); stroke-width: 2; fill: none; stroke-dasharray: 6 5; }
+dl.gloss dt { font-weight: 600; margin-top: 10px; }
+dl.gloss dd { margin: 2px 0 0 0; color: var(--muted); max-width: 72ch; }
+ol.issues > li { margin-bottom: 14px; }
+@media (max-width: 820px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 20px; }
+  nav.toc { position: static; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); }
+  header h1 { font-size: 26px; }
+}
+@media print {
+  nav.toc { display: none; }
+  .wrap { display: block; max-width: none; }
+  h2 { break-after: avoid; }
+  pre, table, figure, .callout { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+  <b>Contents</b>
+  <a href="#why">1. Why this exists</a>
+  <a href="#read">2. Where to read what</a>
+  <a href="#status">3. Status at handover</a>
+  <a href="#fixes">4. Fixes made during the handover</a>
+  <a href="#open">5. Open work</a>
+  <a href="#repo">6. Branches and git state</a>
+  <a href="#fill">7. Still to fill in</a>
+</nav>
+
+<main>
+<header>
+  <h1>CarCar Wireless: Handover Note</h1>
+  <p class="sub">For the next TAs and developers who will maintain the HM-10 wireless link between students' PCs and the CarCar cars. This note holds only what the guides do not: where things stood on the handover date, the evidence behind the fixes, the open work, the state of the branches, and the facts only the outgoing owner knows.</p>
+  <div class="meta">
+    <span><b>Written</b> 2026-11-04</span>
+    <span><b>Outgoing</b> 周冠宇 (Kuan-Yu Chou)</span>
+    <span><b>Repo</b> chousallen/CarCarImproveWireless</span>
+    <span><b>Scope</b> wireless link only</span>
+  </div>
+</header>
+
+<h2 id="why">1. Why this exists</h2>
+<p>The CarCar cars (an Arduino Mega line-following car) used HC-05 Bluetooth Classic modules to talk to the students' PCs. The connection was unstable and hard to predict. Some Windows PCs could not find the module, and some Macs did not give it a serial (COM) port.</p>
+<p>This project replaces the HC-05 with an HM-10 BLE module on the car and offers two ways for the PC to reach it: an ESP32 bridge on USB, or the PC's own Bluetooth. Both are described in <a href="TA_GUIDE.md">TA_GUIDE.md</a>, section 1.</p>
+<p>Other items from the original improvement proposal (a wiring shield, extra IR sensors, a fixed control rate for the line-following PID loop) are not in this repo and <b>were not started here</b>.</p>
+
+<h2 id="read">2. Where to read what</h2>
+<p>The documentation was split by reader on 2026-11-04. Every fact about how the system works has one home in a guide; this note links there instead of repeating it.</p>
+<div class="tablewrap"><table>
+<tr><th>Reader</th><th>Read</th><th>What it covers</th></tr>
+<tr><td>A student using the link</td><td><a href="beginner_guide.md">beginner_guide.md</a></td><td>Wire and name the HM-10, run a chat script by either path, use the link from their own code, a short troubleshooting table. Nothing about the ESP32 or Python internals. Already linked from course material: do not move it.</td></tr>
+<tr><td>A TA running the course</td><td><a href="TA_GUIDE.md">TA_GUIDE.md</a></td><td>What each part does, how data flows, setting up from scratch (Python, a new HM-10, an ESP32), the four bridge commands, changing the target name, the full troubleshooting table, the limits students hit, a glossary.</td></tr>
+<tr><td>A developer changing the code</td><td><a href="DEV_GUIDE.md">DEV_GUIDE.md</a></td><td>Build and flash (ESP-IDF v6.1), firmware and Python internals, the interfaces between the parts and the rules that must not break, BLE and serial parameters, the hardware test and bench tips, the open issues in priority order, git conventions.</td></tr>
+<tr><td>One component in depth</td><td><a href="esp32-hm10/README.md">esp32-hm10/README.md</a>, <a href="esp32-hm10/IMPLEMENTATION_NOTES.md">IMPLEMENTATION_NOTES.md</a>, <a href="chat_hm10/hm10_esp32/README.md">hm10_esp32/README.md</a>, <a href="chat_hm10/hm10_bleak/README.md">hm10_bleak/README.md</a>, <a href="tests/README.md">tests/README.md</a></td><td>Firmware usage and event flow; the two Python APIs; how to run the hardware test.</td></tr>
+<tr><td>An AI coding assistant</td><td><a href="CLAUDE.md">CLAUDE.md</a></td><td>Rules for this repo and the facts about the outgoing owner's bench (ESP-IDF paths, port numbering).</td></tr>
+</table></div>
+<div class="callout"><p><b>Suggested reading order for a new maintainer:</b> TA_GUIDE.md end to end, then sections 3 to 7 of this note, then DEV_GUIDE.md before the first code change. Terms are defined in the TA guide's glossary (section 9).</p></div>
+
+<h2 id="status">3. Status at handover</h2>
+<div class="tablewrap"><table>
+<tr><th>Part</th><th>State</th><th>Notes</th></tr>
+<tr><td>ESP32 firmware <code>esp32-hm10/</code></td><td><span class="tag ok">works</span></td><td>Tested on hardware on 2026-11-04: scans by name in rounds of 30 s until it connects, forwards data both ways, keeps the target name in flash, reconnects after a dropped link. Builds on ESP-IDF v6.1 with no warnings.</td></tr>
+<tr><td>Python, ESP32 path <code>hm10_esp32</code></td><td><span class="tag ok">works</span></td><td>Tested on Linux and Windows 11 on 2026-11-04. The Windows "Access is denied" error on reopening the port, text loss at packet edges, and lost split replies are all fixed (section 4). On Windows, <code>chat_hm10-esp32.py</code> reached "Ready" in 5 of 5 runs, including 2 that had to set the name and reset the ESP32.</td></tr>
+<tr><td>Python, direct path <code>hm10_bleak</code></td><td><span class="tag ok">works</span></td><td>Tested on Linux on 2026-11-04: both directions, all text intact, including spaces at packet edges and line breaks. No automated test.</td></tr>
+<tr><td>HM-10 setup sketch <code>init_hm10/</code></td><td><span class="tag ok">works</span></td><td>Arduino Mega, HM-10 on <code>Serial3</code>. Tested on 2026-11-04.</td></tr>
+<tr><td>Hardware test <code>tests/hw_e2e.py</code></td><td><span class="tag ok">works</span></td><td>22 checks from PC through ESP32, HM-10 and Mega and back, including the chat script. Passed 22 of 22 with ESP-IDF v6.1 and the connect fix on 2026-11-04. Needs the bench in <code>tests/README.md</code>.</td></tr>
+<tr><td><code>environment.yml</code></td><td><span class="tag ok">works</span></td><td>Python 3.12, pyserial 3.5, bleak 3.0.2, tested. The version before commit <code>804c24b</code> had no pyserial, so the ESP32 path failed with <code>ModuleNotFoundError: serial</code>.</td></tr>
+<tr><td>Student guide <code>beginner_guide.md</code></td><td><span class="tag ok">rewritten</span></td><td>Already given to students (the ESP32 path). Rewritten on 2026-11-04 to cover both paths and "use it from your own program"; same path and screenshots. Not yet read by a student.</td></tr>
+<tr><td>TA and developer guides</td><td><span class="tag warn">new</span></td><td>Written on 2026-11-04 from the code and the bench notes. Checked against the code, not yet read by another TA. Expect wording to need fixing.</td></tr>
+<tr><td>Operating systems</td><td><span class="tag warn">partial</span></td><td>ESP32 path: Linux and Windows 11. Direct path: Linux only. Not tested: macOS on either path, the direct path on Windows.</td></tr>
+<tr><td>Testing with students</td><td><span class="tag fill">to fill in</span></td><td>See section 7.</td></tr>
+</table></div>
+
+<h2 id="fixes">4. Fixes made during the handover</h2>
+<p>All on 2026-11-04, each tested on the bench. The code is in the git log; this section keeps the evidence, which is nowhere else. Bugs found by reading the code but never seen in use are in section 5, not here.</p>
+<ol class="issues">
+<li><b>The scan never restarted after its 30 s window</b> (commit <code>bf417fe</code>, on <code>main</code>). The HM-10 advertised for 60 s after the scan ended and the ESP32 never connected until <code>AT+RESET</code>. The fix starts a new scan when a round ends without a match. Seen on hardware: two empty rounds, then it connected 8 s after the HM-10 was powered.</li>
+<li><b><code>HM10ESP32Bridge.listen()</code> lost text</b> (commit <code>2c37117</code>, on <code>main</code>). Each log line was <code>strip()</code>-ed, so a space at the edge of a 20-byte packet vanished ("hello␣" + "world" became "helloworld"), and the part of a packet after a line break had no <code>bt_com:</code> prefix and was thrown away. Confirmed on hardware: a space at byte 20 vanished and <code>abc\r\ndef</code> arrived as <code>abc</code>; the raw ESP32 output was intact, so the fault was in the parser. The fix cuts records at the colour-reset code instead of at line breaks. After it, <code>abc def \r\n</code>, a 20-byte line with a leading space, and 25 bytes with two line breaks all arrived intact.</li>
+<li><b>A reply split across two serial reads was lost</b> (same commit). The parser handled each read on its own, so a line torn between two reads made <code>get_hm10_name()</code> return <code>None</code> and the chat script print "Failed to set name. Exiting." Seen on 2 of 10 tries on Windows and once on Linux. With the fix, the name read correctly 20 of 20 times on Linux and on Windows 11 (the old code: 9 and 14 of 20).</li>
+<li><b>The Windows "Access is denied" error</b> on reopening the ESP32's port (commit <code>706a882</code>, on <code>main</code>): the old code reproduced it, the new code did not.</li>
+<li><b>Buffer overflow on a long <code>AT+NAME</code></b> (commit <code>ee37bf8</code>, on <code>main</code>). <code>mes_buff</code> was 11 bytes but the <code>AT+NAME</code> path copied up to 32 bytes into it. The fix enlarges the buffer. The old firmware showed no visible symptom with 25- and 31-character names, so the test shows the fix does no harm but cannot show it repairs anything. Merged because the overflow is real in the code.</li>
+<li><b><code>OK+CONN</code> came before the link was ready</b> (commit <code>4b5a6be</code>, not yet on <code>main</code>, section 6). The firmware set <code>connect</code> as soon as the scan found the HM-10, about 0.8 s before notifications were enabled, and data sent in that gap was dropped without any log line. Seen on hardware: 3 of 3 messages lost when sent right after <code>OK+CONN</code> on a reboot, 3 of 3 delivered 1.5 s later. The fix adds a <code>link_ready</code> flag for <code>AT+STATUS?</code> and the send path, logs dropped data, and makes <code>reset()</code> wait for <code>OK+CONN</code> instead of a fixed 6 s. Reconnect takes about 6.3 s on the bench.</li>
+<li><b>ESP-IDF v6.1</b> (commit <code>648a97c</code>, not yet on <code>main</code>). The firmware builds on v6.1 with no warnings and still builds on 5.3 and newer. Before this, regenerating <code>sdkconfig</code> gave 2 MB flash in DIO mode instead of the board's 4 MB in QIO mode, because those settings and <code>CONFIG_LOG_COLORS</code> were only in <code>sdkconfig</code>; they are now in <code>sdkconfig.defaults</code>. Flashed and tested with the hardware test, 22 of 22.</li>
+<li><b>Documentation</b>: 5 V wiring for the course's board (commit <code>abe1f3c</code>; the measurement is in TA_GUIDE.md section 4.2), API names and the direct path (<code>804c24b</code>), the split into three guides (<code>6929c99</code>).</li>
+</ol>
+
+<h2 id="open">5. Open work</h2>
+<p>The list is <a href="DEV_GUIDE.md">DEV_GUIDE.md</a>, section 8, the single home for open issues: add to it there, not here. Reviewed at the handover on 2026-11-04:</p>
+<ul>
+<li><span class="tag bad">open, most important</span> <b>Keep testing on different PCs.</b> The direct path depends on each PC's operating system, Bluetooth adapter and driver; the ESP32 path on the CH340 driver. Tested so far: ESP32 path on Linux and Windows 11, direct path on Linux. Untested: macOS on either path, the direct path on Windows. Record each result in section 7.</li>
+<li><span class="tag warn">open</span> <b>The AT helpers throw away car data.</b> <code>get_hm10_name()</code>, <code>get_status()</code> and the others discard any BLE data that arrives while they wait for their reply, and <code>listen()</code> drops car messages that start with <code>OK+</code>. From code reading. Until fixed, call the helpers before the chat, not during it; the chat script does.</li>
+<li><span class="tag ok">accepted</span> <b>Message format:</b> a newline ends a message, as the student guide shows on both sides. No further work.</li>
+<li><span class="tag ok">accepted</span> <b>A failed connect stops the scan</b> (<code>open failed</code> in the log): never seen on hardware, <code>AT+RESET</code> recovers.</li>
+<li><span class="tag ok">accepted</span> <b>Unused menuconfig options</b> <code>CONFIG_HM10_DEVICE_NAME</code> / <code>_MAC</code>: harmless.</li>
+</ul>
+<p>Two bench observations are recorded in the TA guide's troubleshooting table (section 7) and have no explanation yet: the HM-10's <code>OK+CONN</code> notice twice reached the car corrupted (<code>OK+CON\x00</code>, <code>OK+\x03ONN</code>) while ordinary data never was, and opening or closing the ESP32's serial port once caused an extra disconnect and reconnect.</p>
+
+<h2 id="repo">6. Branches and git state</h2>
+<p><code>main</code> is the version students use. On the handover date the newest code and documentation were still on branches, each on top of the previous one, because a branch is merged only after a hardware test:</p>
+<div class="tablewrap"><table>
+<tr><th>Branch</th><th>Commit</th><th>What it holds</th><th>On GitHub</th></tr>
+<tr><td><code>main</code></td><td><code>bf417fe</code></td><td>Stable. Fixes 1 to 5 of section 4.</td><td>yes</td></tr>
+<tr><td><code>fix/esp32-hm10-connect-race</code></td><td><code>4b5a6be</code></td><td>Fix 6: <code>link_ready</code>, <code>reset()</code> waits for <code>OK+CONN</code>.</td><td>no</td></tr>
+<tr><td><code>build/esp-idf-v6.1</code></td><td><code>648a97c</code></td><td>Fix 7: ESP-IDF v6.1, <code>sdkconfig.defaults</code>. On top of the connect fix.</td><td>no</td></tr>
+<tr><td><code>test/hardware-e2e</code></td><td><code>f1acf40</code></td><td><code>tests/hw_e2e.py</code> and <code>tests/README.md</code>. On top of the v6.1 build. Passed 22 of 22.</td><td>no</td></tr>
+<tr><td><code>docs/audience-guides</code></td><td><code>6929c99</code></td><td>The three guides, the slim <code>CLAUDE.md</code>, the trimmed component READMEs. On top of the hardware test.</td><td>no</td></tr>
+<tr><td><code>docs/handover-guides</code></td><td>this commit</td><td>This note, the interfaces table in DEV_GUIDE.md section 5, and the links to it. On top of the guides.</td><td>no</td></tr>
+<tr><td><code>docs/handover</code>, <code>docs/handover-chain</code></td><td><code>63fbe5b</code>, <code>03115c9</code></td><td>Earlier versions of this note, written before the guides existed and repeating what the guides now hold. Superseded: delete them once this branch is merged. <code>docs/handover</code> was pushed once (its first commit).</td><td>partly</td></tr>
+<tr><td><code>fix/at-name-overflow</code>, <code>fix/bt-com-parsing</code>, <code>fix/scan-restart</code>, <code>dev_bleak</code>, <code>dev_transceiver</code>, <code>test_auth</code>, <code>worktree-bench-test</code></td><td></td><td>Fully merged into <code>main</code>. Nothing unique; kept for history.</td><td>some</td></tr>
+</table></div>
+<p>Merging in order (connect race → v6.1 → hardware test → guides → this note) is a fast-forward of <code>main</code>. Commit messages use the Conventional Commits form, <code>type(scope): description</code>; the rest of the conventions are in DEV_GUIDE.md section 9.</p>
+<p>On 2026-11-04, <code>main</code> was <b>force-pushed once</b>: commit <code>8aaf819</code> was replaced by <code>706a882</code>, which adds the missing serial-port fix. A clone made before then needs <code>git pull --rebase</code>, or <code>git reset --hard origin/main</code> if it has no local changes.</p>
+
+<h2 id="fill">7. Still to fill in</h2>
+<p>The repo does not contain these facts. The outgoing owner should fill them in before handing over. Delete each box when it is done.</p>
+
+<h3>Access</h3>
+<div class="callout fill"><p>The GitHub repo is under a personal account (<code>chousallen</code>). Who should own it next: transfer to a course organisation, or add the new TAs as collaborators? Names and GitHub accounts:</p><p class="fillbox">&nbsp;</p></div>
+
+<h3>Hardware</h3>
+<div class="callout fill"><p>How many ESP32 bridges and HM-10 modules exist, which are already flashed or set up, and where they are kept:</p><p class="fillbox">&nbsp;</p><p>Exact ESP32 board model (it uses a CH340 USB chip):</p><p class="fillbox">&nbsp;</p></div>
+
+<h3>Results of student testing</h3>
+<div class="callout fill"><p>Bench test on 2026-11-04: ESP32 path on Linux and Windows 11 (pass); direct path on Linux (pass); after the ESP-IDF v6.1 migration and the connect fix, <code>tests/hw_e2e.py</code> 22 of 22 on Linux.</p><p>Not yet tested: macOS on either path, and the direct path on Windows. Results:</p><p class="fillbox">&nbsp;</p><p>Problems students reported and how they were solved (the Windows "Access is denied" port error was one; others?):</p><p class="fillbox">&nbsp;</p></div>
+
+<h3>Course context</h3>
+<div class="callout fill"><p>Which semester and course hand-outs depend on this, what the car's own code expects over the link (message format, baud rate), and deadlines:</p><p class="fillbox">&nbsp;</p></div>
+
+<h3>Contacts</h3>
+<div class="callout fill"><p>Who to ask (outgoing owner, the professor in charge, Sam Lin, author of the November 2025 commits):</p><p class="fillbox">&nbsp;</p></div>
+
+<h3>Push</h3>
+<div class="callout fill"><p><code>main</code> is on GitHub. The connect fix, the v6.1 build, the hardware test, the guides and this note are local branches only (section 6). Merge and push them, then delete the two superseded handover branches.</p></div>
+
+</main>
+</div>
+</body>
+</html>

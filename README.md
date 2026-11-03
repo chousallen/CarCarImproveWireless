@@ -21,6 +21,8 @@ The PC can reach the HM-10 in two ways:
 | A **TA** running the course | [TA_GUIDE.md](TA_GUIDE.md) | What each device and module does, how to set everything up from scratch, how to fix the usual problems. |
 | A **developer** changing the code | [DEV_GUIDE.md](DEV_GUIDE.md) | Everything in the TA guide, plus building the firmware, the internals, and the rules that must not be broken. |
 
+Taking the project over? Read [HANDOVER.html](HANDOVER.html) after the TA guide: where things stood on the handover date, the evidence behind the fixes, the open work, and the facts only the outgoing owner can fill in.
+
 ## Repository layout
 
 ```
@@ -31,6 +33,7 @@ CarCarImprove/
 ├── TA_GUIDE.md                    # TA guide: parts, setup, troubleshooting
 ├── DEV_GUIDE.md                   # Developer guide: build, internals, invariants
 ├── CLAUDE.md                      # Notes for AI coding assistants
+├── HANDOVER.html                  # Handover note: status, evidence, open work, facts to fill in
 ├── environment.yml                # Conda environment (Python 3.12, pyserial, bleak)
 ├── esp32-hm10/                    # ESP32 bridge firmware (ESP-IDF, C)
 │   ├── main/main.c                # The whole firmware
@@ -56,6 +59,7 @@ Guides, by audience:
 - [beginner_guide.md](beginner_guide.md): students
 - [TA_GUIDE.md](TA_GUIDE.md): TAs
 - [DEV_GUIDE.md](DEV_GUIDE.md): developers
+- [HANDOVER.html](HANDOVER.html): the next maintainers (one-time handover note)
 
 Reference for one component each:
 

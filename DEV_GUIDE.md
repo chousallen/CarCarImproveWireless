@@ -61,6 +61,20 @@ Details and the event sequence: [esp32-hm10/IMPLEMENTATION_NOTES.md](esp32-hm10/
 
 ## 5. Invariants (do not break)
 
+**Interfaces between the parts.** Each link between two parts, what crosses it, and where the details are. There is no other single spec: when you change one side of a link, update the other side and this table.
+
+| Link | What crosses it | Details |
+|---|---|---|
+| Student code → Python modules | `HM10ESP32Bridge`: `send`, `listen`, `get_hm10_name`, `set_hm10_name`, `get_status`, `reset`, `close`. `HM10BleakClient`: `connect`, `send`, `listen`, `disconnect` (async). | `chat_hm10/hm10_esp32/README.md`, `chat_hm10/hm10_bleak/README.md` |
+| PC → ESP32 (USB serial, 115200 8N1) | The four bridge commands, with no line ending. Everything else is data, forwarded in pieces of at most 10 bytes once the link is ready. | [TA_GUIDE.md, section 5](TA_GUIDE.md#5-esp32-bridge-commands), `esp32-hm10/README.md` |
+| ESP32 → PC (same port) | One log record per BLE packet or reply: `ESC[0;32mI (<ms>) bt_com: <payload>ESC[0m\r\n`. Inside the payload `\n` is sent as `\r\n`. Every other log line is not data. | Section 4, `hm10_esp32_bridge.py` |
+| ESP32 ↔ HM-10 (BLE) | Service `0xFFE0`, characteristic `0xFFE1`. ESP32 → HM-10: writes with response. HM-10 → ESP32: notifications of at most 20 bytes. The ESP32 finds the HM-10 by its advertised name, saved with `AT+NAME`. | Section 6, `esp32-hm10/IMPLEMENTATION_NOTES.md` |
+| PC ↔ HM-10 (direct BLE, bleak) | Same characteristic. `send()` cuts text into 20-byte writes without response, 20 ms apart. | Section 4, `chat_hm10/hm10_bleak/README.md` |
+| HM-10 ↔ Arduino Mega (Serial3, 9600 8N1) | Raw bytes both ways, no framing. The HM-10 also sends `OK+CONN` / `OK+LOST` when the link goes up or down (`AT+NOTI1`). `AT` sent to the HM-10 while it is connected drops the link. | `init_hm10/init_hm10.ino`, [TA_GUIDE.md, sections 7 and 8](TA_GUIDE.md#7-troubleshooting), `resource/DS-HM10.pdf` |
+| PC program ↔ car code (message format) | A newline ends a message; no maximum length. `chat_hm10-bleak.py` and the examples in the student guide end each message with `\n`; the interactive `chat_hm10-esp32.py` does not. | Section 8 |
+
+**Rules:**
+
 - **The `bt_com` log tag at INFO level is the data channel.** The firmware sends HM-10 data and `OK+` replies to the PC as ESP-IDF log lines on UART0, the same port as every other log. `hm10_esp32_bridge.py` keeps only records tagged `bt_com:`. Do not rename the tag, lower the log level, or move the data off the log, unless you change the parser in the same commit.
 - **`CONFIG_LOG_COLORS` must stay on** (set in `sdkconfig.defaults`). The parser ends a record at the colour-reset code `ESC[0m\r\n`. Without colours there is no delimiter and every record is lost.
 - **`OK+CONN` means the link is ready for data** (notifications enabled, `link_ready`). The bridge's `reset()`, `chat_hm10-esp32.py` and the hardware test send right after `OK+CONN` and expect the data to arrive.
@@ -98,16 +112,25 @@ The ESP32 path has an end-to-end test, `tests/hw_e2e.py`: it drives PC → ESP32
 
 ## 8. Known open issues
 
-Ordered by priority. Fixed items are left out; see the git log.
+Fixed items are left out: see the git log, and [HANDOVER.html](HANDOVER.html) section 4 for the bench evidence behind the fixes made at the 2026-11 handover.
 
-1. **The AT helpers throw away car data.** `get_hm10_name()`, `get_status()` and the others read and discard any BLE data that arrives while they wait for their reply. `listen()` also drops any car message that starts with `OK+`. From code reading, not seen in use.
-2. **A failed connect stops the scan.** If `esp_ble_gattc_open` fails ("open failed" in the log), `connect` stays true and no new scan starts. From code reading, never seen on hardware. `AT+RESET` recovers.
-3. **No agreed message format** between PC and car (end marker, maximum length). Decide one and use it in both chat scripts and the car code.
-4. **Unused menuconfig options** `CONFIG_HM10_DEVICE_NAME` / `CONFIG_HM10_DEVICE_MAC`. Either use them as the default name or delete them.
-5. **`AT+NAME` reads at most 32 bytes in total**, so a name longer than 25 characters is cut and the rest goes to the HM-10 as data. HM-10 names are at most 12 characters, so this only matters for typos.
-6. **ESP32 path speed**: at most about 400 bytes/s (10 bytes per 25 ms, write with response). Estimated from the code, not measured.
-7. **Reopening the ESP32's port** was once seen to cause an extra disconnect and reconnect (`OK+LOST`, `OK+CONN` on the car). Not investigated.
-8. **No tests run without hardware.** The end-to-end test needs the bench (section 7).
+**Open:**
+
+1. **Keep testing on different PCs.** This is the most important item. The direct path depends on each PC's operating system, Bluetooth adapter and driver; the ESP32 path on the CH340 driver. Tested so far: ESP32 path on Linux and Windows 11, direct path on Linux. Untested: macOS on either path, the direct path on Windows. Record each result in [HANDOVER.html](HANDOVER.html) section 7.
+2. **The AT helpers throw away car data.** `get_hm10_name()`, `get_status()` and the others read and discard any BLE data that arrives while they wait for their reply. `listen()` also drops any car message that starts with `OK+`. From code reading, not seen in use. Until fixed, call the helpers before the chat, not during it (the chat script does).
+
+**Accepted as is** (reviewed at the 2026-11 handover, no work planned):
+
+- **Message format between PC and car:** a newline ends a message. The student guide shows it on both sides (`send("...\n")`, `Serial3.readStringUntil('\n')`). `chat_hm10-esp32.py` does not add it; the chat is interactive, so that is fine.
+- **A failed connect stops the scan.** If `esp_ble_gattc_open` fails ("open failed" in the log), `connect` stays true and no new scan starts. From code reading, never seen on hardware. `AT+RESET` recovers.
+- **Unused menuconfig options** `CONFIG_HM10_DEVICE_NAME` / `CONFIG_HM10_DEVICE_MAC` are defined but never read. Harmless; the name is set with `AT+NAME`.
+
+**Known limits:**
+
+- **`AT+NAME` reads at most 32 bytes in total**, so a name longer than 25 characters is cut and the rest goes to the HM-10 as data. HM-10 names are at most 12 characters, so this only matters for typos.
+- **ESP32 path speed**: at most about 400 bytes/s (10 bytes per 25 ms, write with response). Estimated from the code, not measured.
+- **Reopening the ESP32's port** was once seen to cause an extra disconnect and reconnect (`OK+LOST`, `OK+CONN` on the car). Not investigated.
+- **No tests run without hardware.** The end-to-end test needs the bench (section 7).
 
 ## 9. Git conventions
 

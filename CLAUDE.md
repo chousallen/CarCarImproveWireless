@@ -9,6 +9,8 @@ invariants (the `bt_com` log tag is the data channel, `CONFIG_LOG_COLORS` must s
 `OK+CONN` means the link is ready for data, NVS name beats the `main.c` default), and the
 hardware end-to-end test. `TA_GUIDE.md` has the parts, setup and troubleshooting;
 `beginner_guide.md` is what students read.
+`HANDOVER.html` is the one-time handover note (status, test evidence, open work, branch state):
+facts about how the system works belong in the guides, not there.
 
 ## Rules for this repo
 - The only automated test needs real boards: `python tests/hw_e2e.py --esp <port> --mega <port>`
